@@ -1,0 +1,132 @@
+substitutions:
+  device_name: norman-rf-bridge
+  friendly_name: Norman RF Bridge
+  project_version: 0.2.0-stage0
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  name_add_mac_suffix: true
+  min_version: 2026.4.1
+  platformio_options:
+    upload_speed: 115200
+  project:
+    name: herbertmt978.norman-rf-bridge
+    version: ${project_version}
+  on_boot:
+    - priority: -100
+      then:
+        - text_sensor.template.publish:
+            id: rf_hardware_status
+            state: Not fitted
+        - text_sensor.template.publish:
+            id: rf_mode_status
+            state: hardware_missing
+        - text_sensor.template.publish:
+            id: rf_transmit_status
+            state: disabled
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+logger:
+  level: INFO
+  baud_rate: 115200
+
+api:
+  reboot_timeout: 0s
+
+ota:
+  - platform: esphome
+    id: ota_esphome
+
+safe_mode:
+  boot_is_good_after: 1min
+  num_attempts: 5
+  reboot_timeout: 10min
+
+wifi:
+  id: device_wifi
+  power_save_mode: none
+  reboot_timeout: 0s
+  ap:
+    ssid: Norman RF Bridge Setup
+
+captive_portal:
+
+improv_serial:
+
+esp32_improv:
+  authorizer: none
+
+esp32_ble_tracker:
+  id: ble_tracker
+  scan_parameters:
+    active: true
+
+bluetooth_proxy:
+  id: bluetooth_proxy_component
+  active: true
+
+mdns:
+
+debug:
+  update_interval: 60s
+
+binary_sensor:
+  - platform: status
+    name: Status
+
+sensor:
+  - platform: wifi_signal
+    name: Wi-Fi signal
+    update_interval: 60s
+
+  - platform: uptime
+    name: Uptime
+    type: seconds
+
+text_sensor:
+  - platform: version
+    name: ESPHome version
+
+  - platform: wifi_info
+    ip_address:
+      name: IP address
+    ssid:
+      name: Connected SSID
+
+  - platform: debug
+    reset_reason:
+      name: Reset reason
+
+  - platform: template
+    id: rf_hardware_status
+    name: RF hardware
+    icon: mdi:chip
+    entity_category: diagnostic
+    update_interval: never
+    lambda: return {"Not fitted"};
+
+  - platform: template
+    id: rf_mode_status
+    name: RF mode
+    icon: mdi:radio-tower
+    entity_category: diagnostic
+    update_interval: never
+    lambda: return {"hardware_missing"};
+
+  - platform: template
+    id: rf_transmit_status
+    name: RF transmit
+    icon: mdi:transmit-off
+    entity_category: diagnostic
+    update_interval: never
+    lambda: return {"disabled"};
+
+button:
+  - platform: restart
+    name: Restart
+    entity_category: diagnostic

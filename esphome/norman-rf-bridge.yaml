@@ -1,0 +1,478 @@
+substitutions:
+  device_name: norman-rf-bridge
+  friendly_name: Norman RF Bridge
+  project_version: 0.8.0-experimental
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  name_add_mac_suffix: true
+  min_version: 2026.4.1
+  includes:
+    - ../protocol/include/norman_rf
+    - ../protocol/src/protocol.cpp
+  platformio_options:
+    upload_speed: 115200
+  project:
+    name: herbertmt978.norman-rf-bridge
+    version: ${project_version}
+external_components:
+  - source:
+      type: local
+      path: components
+    components: [norman_rf_monitor]
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+logger:
+  level: INFO
+  baud_rate: 115200
+
+api:
+  reboot_timeout: 0s
+  actions:
+    # Receive-only endpoint namespace: never creates a direct target or HA cover.
+    - action: rf_configure_relay_endpoint
+      variables:
+        slot: int
+        name: string
+        frame: string
+      then:
+        - api.respond:
+            success: !lambda return id(rf_monitor).configure_relay_endpoint(slot, name, frame);
+            error_message: "Relay endpoint rejected: invalid, duplicate, changed identity, busy, or storage fault"
+
+    - action: rf_relay_endpoints_status
+      supports_response: only
+      then:
+        - api.respond:
+            data: !lambda |-
+              root["protocol_version"] = 1;
+              root["capacity"] = 32;
+              root["ready"] = id(rf_monitor).radio_ready();
+              root["relay_enabled"] = id(rf_monitor).relay_enabled();
+              root["relayed_count"] = id(rf_monitor).relayed_count();
+              root["transmitted_count"] = id(rf_monitor).transmitted_count();
+              root["dropped_count"] = id(rf_monitor).dropped_count();
+              root["mode"] = id(rf_monitor).mode_status();
+              auto endpoints = root["endpoints"].to<JsonArray>();
+              for (int slot = 0; slot < 32; ++slot) {
+                auto endpoint = id(rf_monitor).relay_endpoint(slot);
+                if (!endpoint->ready()) continue;
+                auto item = endpoints.add<JsonObject>();
+                item["slot"] = slot;
+                item["name"] = endpoint->name();
+              }
+
+    - action: rf_configure_target
+      variables:
+        slot: int
+        name: string
+        room: string
+        open_frame: string
+        close_frame: string
+        last_index: int
+        open_position: int
+        close_position: int
+      then:
+        - api.respond:
+            success: !lambda return id(rf_monitor).configure_target(slot, name, room, open_frame, close_frame, last_index, open_position, close_position);
+            error_message: "Configuration rejected if slot/identity/frames/storage are invalid"
+
+    - action: rf_learn_target_endpoint
+      variables:
+        slot: int
+        position: int
+        frame: string
+      then:
+        - api.respond:
+            success: !lambda return id(rf_monitor).configure_target_endpoint(slot, position, frame);
+            error_message: "Endpoint rejected if unlearned target, invalid frame, or storage failure"
+
+    - action: rf_target_command
+      variables:
+        slot: int
+        position: int
+        profile_id: string
+      then:
+        - if:
+            condition:
+              lambda: return id(rf_monitor).transmit_target(slot, position, profile_id);
+            then:
+              - wait_until:
+                  condition:
+                    lambda: return !id(rf_monitor).command_active();
+                  timeout: 8s
+              - api.respond:
+                  success: !lambda return id(rf_monitor).command_success();
+                  error_message: !lambda 'return id(rf_monitor).command_success() ? "" : "Radio burst failed; shutter state unknown";'
+            else:
+              - api.respond:
+                  success: false
+                  error_message: "Target unavailable, busy, changed identity, storage failed, or endpoint not learned"
+
+    - action: rf_targets_status
+      supports_response: only
+      then:
+        - api.respond:
+            data: !lambda |-
+              root["protocol_version"] = 3;
+              root["batch_capacity"] = 8;
+              root["ready"] = id(rf_monitor).radio_ready();
+              root["relay_enabled"] = id(rf_monitor).relay_enabled();
+              root["capacity"] = 32;
+              auto targets = root["targets"].to<JsonArray>();
+              for (int slot = 0; slot < 32; ++slot) {
+                auto panel = id(rf_monitor).target(slot);
+                if (!panel->ready()) continue;
+                auto item = targets.add<JsonObject>();
+                item["slot"] = slot;
+                item["profile_id"] = panel->profile_id();
+                item["name"] = panel->name();
+                item["room"] = panel->room();
+                item["open_position"] = panel->open_position();
+                item["close_position"] = panel->close_position();
+                item["close_down_learned"] = panel->supports(0);
+                item["close_up_learned"] = panel->supports(100);
+                item["rolling_index"] = panel->last_index();
+              }
+
+    - action: rf_targets_command
+      variables:
+        targets_json: string
+      then:
+        - if:
+            condition:
+              lambda: return id(rf_monitor).transmit_targets_json(targets_json);
+            then:
+              - wait_until:
+                  condition:
+                    lambda: return !id(rf_monitor).command_active();
+                  timeout: 8s
+              - api.respond:
+                  success: !lambda return id(rf_monitor).command_success();
+                  error_message: !lambda 'return id(rf_monitor).command_success() ? "" : "Batch RF failed; all selected shutter states uncertain; do not automatically retry";'
+            else:
+              - api.respond:
+                  success: false
+                  error_message: "Batch rejected: maximum8 unique learned targets, matching identities/endpoints, idle radio and durable storage required"
+
+    # Compatibility aliases address slot0 only, never the room or every target.
+    - action: rf_configure_panel
+      variables:
+        open_frame: string
+        close_down_frame: string
+        last_index: int
+        open_position: int
+      then:
+        - if:
+            condition:
+              lambda: return id(rf_monitor).configure_panel(open_frame, close_down_frame, last_index, open_position);
+            then:
+              - api.respond:
+                  success: true
+            else:
+              - api.respond:
+                  success: false
+                  error_message: "Panel configuration rejected or persistence failed"
+
+    - action: rf_learn_close_up
+      variables:
+        frame: string
+      then:
+        - if:
+            condition:
+              lambda: return id(rf_monitor).configure_close_up(frame);
+            then:
+              - api.respond:
+                  success: true
+            else:
+              - api.respond:
+                  success: false
+                  error_message: "Upward-close frame rejected or persistence failed"
+
+    - action: rf_panel_command
+      variables:
+        position: int
+      then:
+        - if:
+            condition:
+              lambda: return id(rf_monitor).transmit_command(position);
+            then:
+              - wait_until:
+                  condition:
+                    lambda: return !id(rf_monitor).command_active();
+                  timeout: 8s
+              - api.respond:
+                  success: !lambda return id(rf_monitor).command_success();
+                  error_message: !lambda 'return id(rf_monitor).command_success() ? "" : "Radio burst failed; shutter state is unknown";'
+            else:
+              - api.respond:
+                  success: false
+                  error_message: "Unavailable, busy, persistence failed, or position not learned"
+
+    - action: rf_panel_status
+      supports_response: only
+      then:
+        - api.respond:
+            data: !lambda |-
+              root["protocol_version"] = 1;
+              root["profile_id"] = id(rf_monitor).profile_id();
+              root["ready"] = id(rf_monitor).panel_ready() && id(rf_monitor).radio_ready();
+              root["open_position"] = id(rf_monitor).open_position();
+              root["close_up_learned"] = id(rf_monitor).close_up_ready();
+              root["relay_enabled"] = id(rf_monitor).relay_enabled();
+              root["rolling_index"] = id(rf_monitor).rolling_index();
+
+    - action: rf_set_relay
+      variables:
+        enabled: bool
+      then:
+        - if:
+            condition:
+              lambda: return id(rf_monitor).set_relay(enabled);
+            then:
+              - api.respond:
+                  success: true
+            else:
+              - api.respond:
+                  success: false
+                  error_message: "Relay configuration rejected or persistence failed"
+
+    # Bounded commissioning test. Recovery is local even though API disconnects.
+    - action: rf_test_wifi_pause
+      then:
+        - script.execute: rf_wifi_pause_test
+
+script:
+  - id: rf_wifi_pause_test
+    mode: single
+    then:
+      - wifi.disable:
+      - delay: 30s
+      - wifi.enable:
+      - delay: 45s
+      - if:
+          condition:
+            not:
+              wifi.connected:
+          then:
+            - button.press: bridge_restart
+
+ota:
+  - platform: esphome
+    id: ota_esphome
+
+safe_mode:
+  boot_is_good_after: 1min
+  num_attempts: 5
+  reboot_timeout: 10min
+
+wifi:
+  id: device_wifi
+  power_save_mode: none
+  reboot_timeout: 0s
+  ap:
+    ssid: Norman RF Bridge Setup
+
+captive_portal:
+
+improv_serial:
+
+esp32_improv:
+  authorizer: none
+
+esp32_ble_tracker:
+  id: ble_tracker
+  scan_parameters:
+    active: true
+
+bluetooth_proxy:
+  id: bluetooth_proxy_component
+  active: true
+
+mdns:
+
+spi:
+  id: norman_radio_spi
+  clk_pin: GPIO18
+  miso_pin: GPIO19
+  mosi_pin: GPIO23
+  interface: spi
+
+norman_rf_monitor:
+  id: rf_monitor
+  spi_id: norman_radio_spi
+  cs_pin: GPIO5
+  ce_pin: GPIO4
+
+debug:
+  update_interval: 60s
+
+binary_sensor:
+  - platform: template
+    name: RF panel ready
+    entity_category: diagnostic
+    lambda: return id(rf_monitor).panel_ready();
+
+  - platform: status
+    name: Status
+
+  - platform: template
+    name: RF radio ready
+    device_class: connectivity
+    entity_category: diagnostic
+    lambda: return id(rf_monitor).radio_ready();
+
+text_sensor:
+  - platform: template
+    name: RF panel
+    entity_category: diagnostic
+    update_interval: 5s
+    lambda: return {id(rf_monitor).panel_status()};
+
+  - platform: version
+    name: ESPHome version
+
+  - platform: wifi_info
+    ip_address:
+      name: IP address
+    ssid:
+      name: Connected SSID
+
+  - platform: debug
+    reset_reason:
+      name: Reset reason
+
+  - platform: template
+    id: rf_hardware_status
+    name: RF hardware
+    icon: mdi:chip
+    entity_category: diagnostic
+    update_interval: 15s
+    lambda: return {id(rf_monitor).hardware_status()};
+
+  - platform: template
+    id: rf_mode_status
+    name: RF mode
+    icon: mdi:radio-tower
+    entity_category: diagnostic
+    update_interval: 15s
+    lambda: return {id(rf_monitor).mode_status()};
+
+  - platform: template
+    id: rf_transmit_status
+    name: RF transmit
+    icon: mdi:transmit-off
+    entity_category: diagnostic
+    update_interval: 15s
+    lambda: return {id(rf_monitor).transmit_status()};
+
+  - platform: template
+    name: RF register snapshot
+    icon: mdi:chip
+    entity_category: diagnostic
+    update_interval: 60s
+    lambda: return {id(rf_monitor).register_snapshot()};
+
+sensor:
+  - platform: template
+    name: RF relayed commands
+    entity_category: diagnostic
+    state_class: total_increasing
+    accuracy_decimals: 0
+    update_interval: 5s
+    lambda: return id(rf_monitor).relayed_count();
+
+  - platform: template
+    name: RF transmitted frames
+    entity_category: diagnostic
+    state_class: total_increasing
+    accuracy_decimals: 0
+    update_interval: 5s
+    lambda: return id(rf_monitor).transmitted_count();
+
+  - platform: wifi_signal
+    name: Wi-Fi signal
+    update_interval: 60s
+
+  - platform: uptime
+    name: Uptime
+    type: seconds
+
+  - platform: template
+    name: RF received frames
+    entity_category: diagnostic
+    state_class: total_increasing
+    accuracy_decimals: 0
+    update_interval: 15s
+    lambda: return id(rf_monitor).received_count();
+
+  - platform: template
+    name: RF valid frames
+    entity_category: diagnostic
+    state_class: total_increasing
+    accuracy_decimals: 0
+    update_interval: 15s
+    lambda: return id(rf_monitor).valid_count();
+
+  - platform: template
+    name: RF invalid frames
+    entity_category: diagnostic
+    state_class: total_increasing
+    accuracy_decimals: 0
+    update_interval: 15s
+    lambda: return id(rf_monitor).invalid_count();
+
+  - platform: template
+    name: RF duplicate frames
+    entity_category: diagnostic
+    state_class: total_increasing
+    accuracy_decimals: 0
+    update_interval: 15s
+    lambda: return id(rf_monitor).duplicate_count();
+
+  - platform: template
+    name: RF dropped frames
+    entity_category: diagnostic
+    state_class: total_increasing
+    accuracy_decimals: 0
+    update_interval: 15s
+    lambda: return id(rf_monitor).dropped_count();
+
+button:
+  - platform: template
+    name: RF open
+    on_press:
+      - lambda: id(rf_monitor).transmit_command(id(rf_monitor).open_position());
+
+  - platform: template
+    name: RF close down
+    on_press:
+      - lambda: id(rf_monitor).transmit_command(0);
+
+  - platform: template
+    name: RF close up
+    disabled_by_default: true
+    on_press:
+      - lambda: id(rf_monitor).transmit_command(100);
+
+  - platform: restart
+    id: bridge_restart
+    name: Restart
+    entity_category: diagnostic
+
+switch:
+  - platform: template
+    name: RF autonomous relay
+    entity_category: config
+    # The RF profile is the sole persistent owner. Do not issue OFF at boot.
+    restore_mode: DISABLED
+    lambda: return id(rf_monitor).relay_enabled();
+    turn_on_action:
+      - lambda: id(rf_monitor).set_relay(true);
+    turn_off_action:
+      - lambda: id(rf_monitor).set_relay(false);

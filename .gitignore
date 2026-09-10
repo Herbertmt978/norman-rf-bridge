@@ -1,0 +1,18 @@
+.esphome/
+.pio/
+.vscode/
+secrets.yaml
+build/
+*.bin
+*.elf
+*.map
+__pycache__/
+*.pyc
+# Private operational records and installation data never belong in public Git.
+docs/aegis/
+docs/history/
+captures/
+*.ci16
+*.log
+*.local.json
+*.backup*
