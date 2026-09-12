@@ -39,6 +39,15 @@ target_include_directories(norman_rf_target_batch_tests PRIVATE
 target_link_libraries(norman_rf_target_batch_tests PRIVATE norman_rf_protocol)
 add_test(NAME norman_rf_target_batch_tests COMMAND norman_rf_target_batch_tests)
 
+add_executable(norman_rf_command_repeat_tests
+  tests/command_repeat_tests.cpp
+  ../esphome/components/norman_rf_monitor/learned_panel.cpp
+)
+target_include_directories(norman_rf_command_repeat_tests PRIVATE
+  tests/fakes ../esphome/components/norman_rf_monitor)
+target_link_libraries(norman_rf_command_repeat_tests PRIVATE norman_rf_protocol)
+add_test(NAME norman_rf_command_repeat_tests COMMAND norman_rf_command_repeat_tests)
+
 add_executable(norman_rf_relay_endpoint_tests
   tests/relay_endpoint_tests.cpp
   ../esphome/components/norman_rf_monitor/learned_panel.cpp

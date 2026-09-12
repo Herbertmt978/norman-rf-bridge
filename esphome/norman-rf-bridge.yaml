@@ -1,7 +1,7 @@
 substitutions:
   device_name: norman-rf-bridge
   friendly_name: Norman RF Bridge
-  project_version: 0.9.0-experimental
+  project_version: 0.9.1-experimental
 
 esphome:
   name: ${device_name}
@@ -159,6 +159,27 @@ api:
               - api.respond:
                   success: false
                   error_message: "Batch rejected: maximum8 unique learned targets, matching identities/endpoints, idle radio and durable storage required"
+
+    # Manual diagnostic only: repeat the same completed command, never new codes.
+    - action: rf_targets_repeat
+      variables:
+        targets_json: string
+      then:
+        - if:
+            condition:
+              lambda: return id(rf_monitor).transmit_targets_json(targets_json, true);
+            then:
+              - wait_until:
+                  condition:
+                    lambda: return !id(rf_monitor).command_active();
+                  timeout: 8s
+              - api.respond:
+                  success: !lambda return id(rf_monitor).command_success();
+                  error_message: !lambda 'return id(rf_monitor).command_success() ? "" : "Repeat RF failed; shutter state remains unknown";'
+            else:
+              - api.respond:
+                  success: false
+                  error_message: "Repeat rejected: idle radio, identical last command, under60s, unchanged identity/counter and at most2 repeats required"
 
     # Compatibility aliases address slot0 only, never the room or every target.
     - action: rf_configure_panel

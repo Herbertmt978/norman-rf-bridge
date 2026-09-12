@@ -140,6 +140,36 @@ There is no physical position or battery feedback through this RF transport.
 
 ## Recovery and limits
 
+### Explicit identical-command repeat
+
+Firmware0.9.1 adds `rf_targets_repeat`, a manual diagnostic action with the same
+`targets_json` shape as `rf_targets_command`. Supply the identical slots, order,
+positions and profile IDs from the most recent completed local command. A repeat
+sends the same30-byte application frames plus the same two padding bytes on
+channel15,100copies per target at the existing55ms round cadence. It does not
+reserve or advance any rolling index. The first command already sends100copies;
+this action tests a later additional burst, not a previously absent copy loop.
+
+At most two repeats are allowed within60seconds of the original burst starting.
+The radio must be idle and the previous command must have completed. A new local
+command, reconfiguration, radio failure, changed profile/counter or conflicting
+observed command invalidates eligibility. Reboot clears the cache. Incoming RF
+can invalidate the cache but cannot create repeat authority. An unseen external
+command cannot be detected, so test promptly with other controls idle.
+
+For one target originally sent on its own:
+
+```powershell
+python scripts/bridge-control.py --host BRIDGE_IP --expected-name BRIDGE_NAME repeat-target --slot SLOT --profile-id PROFILE_ID --position POSITION
+```
+
+Do not retry a stale command or run an unbounded loop. Identical duplicates may
+be ignored by a motor that already accepted them, and may still fail if that
+code is unacceptable. Autonomous relay retains its exact-frame duplicate cache:
+a repeated local packet is not promised another forwarding burst at every bridge.
+Observe actual movement and restore the starting state. HA room covers do not
+automatically call this action; reliable unattended schedules remain unqualified.
+
 ### Passive Wi-Fi logs
 
 USB power alone is sufficient once Wi-Fi has been provisioned. For a bounded

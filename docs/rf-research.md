@@ -288,3 +288,55 @@ so those commands were received but not forwarded. Version0.8 closes that
 eligibility gap with separate receive-only endpoints, as described above;
 it does not establish a cause or remedy for every missed physical movement.
 No generated native-room direct command or room counter has been introduced.
+
+## Later HA room checks and identical repeats — 12 September 2026
+
+The production HA RF candidate exposed nine physically mapped section covers
+and two room covers. Separate room close/open checks passed again, but subsequent
+combined and sequential-room runs missed sections. In the sequential run, with
+a five-second gap after the office burst, HA completed both actions while the
+cameras showed office4/5 and lounge2/4 closed. Open restored the lounge but left
+two office sections closed; individual Opens restored them. The schedule was
+not migrated or enabled. The HA position is still an assumed command intent.
+
+At the owner's request,0.9.1 adds explicit repeats of the most recent completed
+local command. These are separate100-copy bursts using the original frames,
+not repeated new rolling-code reservations. Maximum two additional bursts
+within60seconds, exact request matching, volatile storage and invalidation
+rules are documented in [commissioning](commissioning.md#explicit-identical-command-repeat).
+Default sending and autonomous relay policy are unchanged.
+
+Both prototypes received0.9.1; all14 identities/endpoints were retained. Office
+rolling counters were identical across its update; downstairs office counters
+advanced while it received the ongoing office test, with no reset. Five host
+CTest suites, three decoder tests, four logger tests and the pinned ESPHome
+build passed. Fresh boot rejected repeat without a prior local command.
+
+Camera-observed comparison:
+
+| Trial | Original burst | Later identical burst(s) | Restoration |
+| --- | --- | --- | --- |
+| Office Close | Four of five closed; Top Left remained open | First repeat still4/5; second repeat5/5 | New Open reopened5/5; an extra identical Open did not reverse them |
+| Office second pair | Close5/5 on first burst | One identical Close retained5/5 | Open5/5 on first burst |
+| Lounge Close | Three of four closed; third from camera-left stayed open | First identical repeat4/4; second retained4/4 | New Open reopened4/4 |
+
+Originals and repeats were about20seconds apart in these manual comparisons.
+The office log recorded500,1000,1500 total transmitted copies across its first
+Close and two repeats. Native counter readback showed only the original
+reservation. A further repeat request was refused. Lounge repeats likewise
+left the four command counters unchanged. These results demonstrate recovery
+from specific misses, not a generally validated automatic retry cadence.
+
+During the first office comparison, the downstairs bridge, still running0.9,
+logged `radio_tx_failed` partway through a channel39 relay. The latched fault
+disabled autonomous repeating. Its subsequent0.9.1 OTA/reboot restored the
+saved enabled policy. The existing diagnostic does not distinguish a timing,
+SPI, supply or radio fault; no root cause or permanent fix is claimed. Remote
+shutter range alone cannot explain the local transmitter-completion failure,
+because this sender has automatic acknowledgements disabled. Investigate this
+fault before relying on unattended schedules or claiming a finished repeater.
+
+Original hub/repeaters remained powered throughout. Exact-copy replays can be
+suppressed by other bridges' duplicate caches; these tests do not prove every
+RF hop repeats again. All tested shutters were returned open. Raw captures,
+household images and installation identities remain outside the public repo.

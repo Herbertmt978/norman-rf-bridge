@@ -28,6 +28,9 @@ async def main(args):
                 'slot': args.slot, 'name': args.name, 'frame': args.frame,
             }),
             'target-command': ('rf_target_command', {'slot': args.slot, 'position': args.position, 'profile_id': args.profile_id}),
+            'repeat-target': ('rf_targets_repeat', {'targets_json': json.dumps({
+                'slots': [args.slot], 'positions': [args.position], 'profile_ids': [args.profile_id],
+            })}),
             'learn-target-endpoint': ('rf_learn_target_endpoint', {'slot': args.slot, 'position': args.position, 'frame': args.frame}),
             'commission-target': ('rf_configure_target', {
                 'slot': args.slot, 'name': args.name, 'room': args.room,
@@ -61,7 +64,7 @@ async def main(args):
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--host', required=True)
 parser.add_argument('--expected-name', required=True)
-parser.add_argument('operation', choices=['status', 'targets', 'relay-endpoints', 'learn-relay-endpoint', 'commission', 'commission-target', 'command', 'target-command', 'relay', 'learn-close-up', 'learn-target-endpoint'])
+parser.add_argument('operation', choices=['status', 'targets', 'relay-endpoints', 'learn-relay-endpoint', 'commission', 'commission-target', 'command', 'target-command', 'repeat-target', 'relay', 'learn-close-up', 'learn-target-endpoint'])
 parser.add_argument('--slot', type=int, choices=range(32))
 parser.add_argument('--profile-id')
 parser.add_argument('--name')
@@ -78,6 +81,7 @@ args = parser.parse_args()
 required = {'commission': ['open_frame', 'close_down_frame', 'last_index'],
             'commission-target': ['slot', 'name', 'room', 'open_frame', 'close_down_frame', 'last_index'],
             'target-command': ['slot', 'position', 'profile_id'],
+            'repeat-target': ['slot', 'position', 'profile_id'],
             'learn-target-endpoint': ['slot', 'position', 'frame'],
             'learn-relay-endpoint': ['slot', 'name', 'frame'],
             'command': ['position'], 'relay': ['enabled'], 'learn-close-up': ['frame']}

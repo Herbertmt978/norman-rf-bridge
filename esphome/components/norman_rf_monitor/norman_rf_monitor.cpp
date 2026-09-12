@@ -260,6 +260,7 @@ bool NormanRfMonitor::configure_target(int slot, const std::string &name, const 
                                        const std::string &open, const std::string &close,
                                        int last_index, int open_position, int close_position) {
   if (tx_active_ || slot < 0 || slot >= 32) return false;
+  command_repeat_.clear();
   norman_rf::Frame o{}, c{};
   if (!norman_rf::parse_frame_hex(open, o) || !norman_rf::parse_frame_hex(close, c)) return false;
   for (const auto &endpoint : relay_endpoints_) if (endpoint.accepts(o) || endpoint.accepts(c)) return false;
@@ -269,6 +270,7 @@ bool NormanRfMonitor::configure_target(int slot, const std::string &name, const 
 
 bool NormanRfMonitor::configure_target_endpoint(int slot, int position, const std::string &frame) {
   if (tx_active_ || slot < 0 || slot >= 32) return false;
+  command_repeat_.clear();
   norman_rf::Frame parsed{};
   if (!norman_rf::parse_frame_hex(frame, parsed)) return false;
   for (const auto &endpoint : relay_endpoints_) if (endpoint.accepts(parsed)) return false;
@@ -358,6 +360,7 @@ void NormanRfMonitor::select_receive_channel_() {
 void NormanRfMonitor::handle_valid_frame_(const std::array<uint8_t, kPayloadWidth> &payload, uint32_t now) {
   norman_rf::Frame frame{};
   std::copy_n(payload.begin(), frame.size(), frame.begin());
+  command_repeat_.observe(frame);
   const auto match = match_received_command(panels_, relay_endpoints_, frame);
   if (!match.authorized()) return;
   const int slot = match.panel_slot;
@@ -399,9 +402,24 @@ bool NormanRfMonitor::transmit_targets(const std::vector<int32_t> &slots,
                                      const std::vector<int32_t> &positions,
                                      const std::vector<std::string> &identities) {
   if (!can_transmit_()) return false;
+  command_repeat_.clear();
   BatchFrames frames{};
   if (!prepare_target_batch(panels_, slots, positions, identities, frames)) return false;
-  return start_bursts_(frames, slots.size(), 15, 100, false);
+  if (!start_bursts_(frames, slots.size(), 15, 100, false)) return false;
+  command_repeat_.remember(slots, positions, identities, frames, panels_, millis());
+  return true;
+}
+
+bool NormanRfMonitor::repeat_targets(const std::vector<int32_t> &slots,
+                                    const std::vector<int32_t> &positions,
+                                    const std::vector<std::string> &identities) {
+  if (!can_transmit_() || !command_success_) return false;
+  BatchFrames frames{};
+  if (!command_repeat_.take(slots, positions, identities, panels_, millis(), frames)) return false;
+  if (!start_bursts_(frames, slots.size(), 15, 100, false)) return false;
+  ESP_LOGI(TAG, "Explicit repeat: unchanged command bytes and rolling indices; targets=%u",
+           static_cast<unsigned>(slots.size()));
+  return true;
 }
 
 bool NormanRfMonitor::start_bursts_(const BatchFrames &frames, size_t count, int channel, int copies, bool relay) {
@@ -440,9 +458,9 @@ bool NormanRfMonitor::start_bursts_(const BatchFrames &frames, size_t count, int
   return true;
 }
 
-bool NormanRfMonitor::transmit_targets_json(const std::string &request) {
+bool NormanRfMonitor::transmit_targets_json(const std::string &request, bool repeat) {
   if (request.size() > 2048 || !can_transmit_()) return false;
-  return json::parse_json(request, [this](JsonObject root) -> bool {
+  return json::parse_json(request, [this, repeat](JsonObject root) -> bool {
     if (root.size() != 3 || !root["slots"].is<JsonArray>() || !root["positions"].is<JsonArray>() ||
         !root["profile_ids"].is<JsonArray>()) return false;
     const auto slots = root["slots"].as<JsonArray>();
@@ -457,7 +475,7 @@ bool NormanRfMonitor::transmit_targets_json(const std::string &request) {
       s.push_back(slots[i].as<int32_t>()); p.push_back(positions[i].as<int32_t>());
       ids.emplace_back(identities[i].as<const char *>());
     }
-    return transmit_targets(s, p, ids);
+    return repeat ? repeat_targets(s, p, ids) : transmit_targets(s, p, ids);
   });
 }
 
@@ -507,7 +525,10 @@ void NormanRfMonitor::finish_test_(const char *status) {
   this->ce_pin_->digital_write(true);
   this->tx_active_ = false;
   if (!tx_is_relay_) command_success_ = std::string(status) == "complete_not_acknowledged";
-  if (std::string(status) != "complete_not_acknowledged") relay_fault_ = true;
+  if (std::string(status) != "complete_not_acknowledged") {
+    relay_fault_ = true;
+    command_repeat_.clear();
+  }
   this->tx_has_finished_ = true;
   this->tx_last_finished_ms_ = millis();
   this->tx_status_ = status;

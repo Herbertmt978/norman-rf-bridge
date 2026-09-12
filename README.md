@@ -9,7 +9,7 @@ That integration's RF candidate uses this bridge without calling the hub. Its
 existing HTTP hub controls remain separate; neither path provides verified
 physical shutter position through the RF prototype.
 
-## Current state: 0.9.0 experimental; local room tests passed
+## Current state: experimental; room delivery remains intermittent
 
 Version 0.9 adds bounded forwarding of bridge-originated commands: an enabled
 relay scans channels 15 and 39, forwarding 15 to 39 or 39 to 59. Channel 59 is
@@ -20,6 +20,12 @@ by a successful whole-room close/open for each room using its local ESP.
 Another ESP also received and forwarded a matching bridge-originated frame.
 The original Norman hardware remained powered: isolated ESP-only delivery and
 reliable range extension are still unqualified. See [current evidence](docs/rf-research.md).
+
+Later HA-cover tests reproduced missed sections in both rooms, including when
+rooms were sent sequentially with a five-second gap. A completed radio burst is
+not a shutter acknowledgement. The sunrise/sunset migration is therefore on
+hold. Version0.9.1 adds an explicit diagnostic repeat action; it does not change
+default sending or claim to fix delivery. See [repeat testing](docs/commissioning.md#explicit-identical-command-repeat).
 
 The connected Freenove ESP32-WROOM board has an nRF24-compatible PA/LNA attached.
 It provides:
@@ -43,7 +49,8 @@ Earlier fixed-order0.7.0 and rotating-order0.7.1 batches moved only one of five
 study sections in watched trials. On12September, the existing interleaved
 scheduler passed five-section office and four-panel lounge tests from their
 respective local bridges. This is one successful close/open pair per room,
-not prolonged reliability or simultaneous motor-start qualification. Generating
+followed by further passes and failures, not prolonged reliability or simultaneous
+motor-start qualification. Generating
 native whole-room packets remains under investigation; these room controls use
 learned individual commands. Whole-house qualification is separate from
 commissioning. Channel39→59 relay was

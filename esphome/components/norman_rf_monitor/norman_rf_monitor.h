@@ -10,6 +10,7 @@
 #include "learned_panel.h"
 #include "received_command.h"
 #include "target_batch.h"
+#include "command_repeat.h"
 
 namespace esphome::norman_rf_monitor {
 
@@ -42,7 +43,9 @@ class NormanRfMonitor : public Component,
   bool transmit_target(int slot, int position, const std::string &expected_profile);
   bool transmit_targets(const std::vector<int32_t> &slots, const std::vector<int32_t> &positions,
                         const std::vector<std::string> &identities);
-  bool transmit_targets_json(const std::string &request);
+  bool transmit_targets_json(const std::string &request, bool repeat = false);
+  bool repeat_targets(const std::vector<int32_t> &slots, const std::vector<int32_t> &positions,
+                      const std::vector<std::string> &identities);
   bool configure_panel(const std::string &open, const std::string &close, int last_index, int open_position);
   bool configure_close_up(const std::string &frame);
   bool transmit_command(int position);
@@ -154,6 +157,7 @@ class NormanRfMonitor : public Component,
   bool relay_requested_{false};
   bool relay_policy_ready_{false};
   norman_rf::RelayCache relay_cache_;
+  CommandRepeat command_repeat_;
   bool relay_fault_{false};
   bool tx_is_relay_{false};
   bool command_success_{false};
