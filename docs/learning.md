@@ -12,7 +12,15 @@ Fit the radio antenna before powering the board. Follow the [wiring guide](wirin
 install the firmware, provision Wi-Fi and add the discovered device to HA's
 ESPHome integration. Keep your existing Norman controller working.
 
-Install the [Norman integration](https://github.com/Herbertmt978/Norman-HA-Integration).
+Install the matching **Norman 0.5.0b2 candidate** from the
+[RF integration branch](https://github.com/Herbertmt978/Norman-HA-Integration/tree/Herb/esphome-rf-transport).
+At the time of this update, [PR18](https://github.com/Herbertmt978/Norman-HA-Integration/pull/18)
+is still unmerged: the normal HACS release does not contain this flow yet.
+For a manual candidate install, back up your existing integration folder, copy
+the branch's `custom_components/norman_gen1` directory into HA's
+`config/custom_components/norman_gen1`, and restart HA. A subsequent HACS update
+can replace a manual candidate, so check the installed version before learning.
+
 In Settings → Devices & services → Add integration, choose Norman, then
 **ESPHome RF bridge**. Select the adopted bridge. The profile-management menu
 appears even when the board has not learned anything yet.
