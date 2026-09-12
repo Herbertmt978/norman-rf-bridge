@@ -112,8 +112,10 @@ only rolling fields and the recalculated CRC, not a guessed universal opcode.
 - Physically observe each supported direction, then restore the starting state.
 - Reboot and verify the saved panel, counter and relay-enabled state; boot must
   not emit a movement command.
-- Confirm a source channel39 burst produces one bounded unchanged channel59
-  relay, with duplicate suppression. Do not claim an all-house test from this.
+- Confirm source channel15 produces one bounded unchanged channel39 relay and
+  source channel39 produces a channel59 relay. Confirm echoes and channel59
+  inputs are not forwarded. Measure each placement; do not claim an all-house
+  test from one received frame or one successful movement.
 - Disconnect Wi-Fi temporarily and confirm local repeating continues. The
   commissioning `rf_test_wifi_pause` action pauses Wi-Fi30seconds, then enables
   it; a local recovery script restarts after another45seconds if still offline.
@@ -137,6 +139,26 @@ State is unknown on startup and explicitly assumed after a completed RF burst.
 There is no physical position or battery feedback through this RF transport.
 
 ## Recovery and limits
+
+### Passive Wi-Fi logs
+
+USB power alone is sufficient once Wi-Fi has been provisioned. For a bounded
+read-only log recording, without sending a radio or movement action:
+
+```powershell
+python scripts/bridge-log.py --host BRIDGE_IP --expected-name BRIDGE_NAME --seconds 60 --output D:\PrivateCaptures\bridge.jsonl
+```
+
+Create the private destination directory first. The file must not already
+exist. Logs are timestamped at the PC and may contain installation-specific
+RF frames; do not commit them. The default cap is16MiB; recordings are limited
+to one hour and64MiB. The tool disconnects when its duration or byte cap is
+reached. A quiet log is not proof that no RF was present: radio tuning, reception
+and firmware log budgets also affect visibility.
+
+Both prototypes were updated to0.9 on12September with their14 target identities
+and two native-room receive endpoints retained. Both have their own antennas
+and relay enabled. This supersedes the earlier antenna-loan state below.
 
 `esphome/stage0-recovery.yaml` and the `*-stage0.ps1` build/flash/OTA scripts use
 the original radio-free0.2.0-stage0 image. They do not accidentally build the

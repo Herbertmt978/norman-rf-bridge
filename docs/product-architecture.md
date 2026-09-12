@@ -1,6 +1,6 @@
 # Product architecture
 
-## Current implementation: 0.8.0 experimental
+## Current implementation: 0.9.0 experimental
 
 Up to32 explicitly commissioned Gen1 section targets per ESP32. Each has its own
 exact templates/counter and preferred close direction; all share one SPI radio
@@ -29,12 +29,19 @@ without transmission or rewind. Batch failure makes all selected states uncertai
 This copy count follows the locally successful burst test; the
 earlier proposed 1–3-copy limit was not established by measurement.
 
-Repeating does not generate a counter: an exact learned command received on
-channel39 is repeated unchanged on channel59, 20 copies at55ms spacing. A
+Repeating does not generate a counter. While enabled, the receiver scans
+channels15 and39 at20ms nominal dwell. An exact learned command received on15
+is repeated unchanged on39; a command received on39 is repeated on59, with
+20 copies at55ms spacing. Channel59 is terminal. The receive FIFO is drained
+before retuning so queued frames retain their channel attribution. A
 64-entry/60-second exact-frame cache suppresses echoes, including this unit's
 direct commands. Live entries are not evicted to admit new traffic; saturation
-fails relay closed. This directional path avoids relaying its own channel59
-output. Other channels, unlearned command families and reply packets are not relayed.
+fails relay closed. Each bridge forwards an exact frame at most once within
+the suppression window, even if it later hears that frame on another channel.
+An originating bridge suppresses returning copies of its own direct command.
+Thus the path is bounded but does not guarantee both hops occur: placement,
+receive timing and which channel is heard first matter. Other channels,
+unlearned command families and reply packets are not relayed.
 
 Native room endpoints are explicitly learned in a separate32-slot receive
 allowlist, using the same protocol command comparison. Only the newly received
@@ -82,10 +89,13 @@ The connected prototype demonstrates learned individual-command repeating
 during Wi-Fi loss. UART records native room Open/Close forwarding, but the
 watched trial missed one study section; subsequent direct control moved it.
 Native room physical reliability and independent RF attribution remain open.
-Current39-to59 operation has not
-proven reception from the hub without another original repeater. A dedicated
+Version0.9 adds reception of direct hub/ESP channel15 traffic and logs confirm
+that first-hop forwarding. Exclusive ESP range extension and reliable delivery
+without original repeaters are still unqualified. A dedicated
 radio-only Product B image, physical commissioning control,
-enclosure and production fixture remain future work. It is not yet a universal
+qualified enclosure and production fixture remain future work. Owner-supplied
+STEP enclosure designs are stored under hardware/enclosure, with fit and print
+qualification still pending. It is not yet a universal
 Norman replacement that can be sold without installation-specific commissioning.
 
 Product A* adds HA control and diagnostics through ESPHome while keeping the

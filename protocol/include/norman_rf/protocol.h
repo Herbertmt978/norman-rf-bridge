@@ -46,6 +46,12 @@ static_assert(sizeof(TargetProfile) == 193, "Persistent target layout changed");
 
 enum class RelayDecision { eligible, duplicate, full };
 
+// Bounded RF path shared by hub-originated and bridge-originated commands.
+// No same-channel forwarding or terminal-channel retransmission is permitted.
+[[nodiscard]] constexpr int relay_output_channel(int input_channel) {
+  return input_channel == 15 ? 39 : input_channel == 39 ? 59 : -1;
+}
+
 // Exact application-frame cache; never evict a live entry to admit another.
 // Refresh echoes so a circulating packet cannot become eligible at expiry.
 class RelayCache {

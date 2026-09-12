@@ -171,6 +171,24 @@ void test_relay_cache() {
   expect(wrap.admit(extra, 100U) == norman_rf::RelayDecision::duplicate, "clock wrap duplicate");
 }
 
+void test_forwarding_path() {
+  expect(norman_rf::relay_output_channel(15) == 39, "direct ESP/hub traffic has a first hop");
+  expect(norman_rf::relay_output_channel(39) == 59, "original repeater traffic retains final hop");
+  for (int channel = -1; channel <= 126; ++channel) {
+    if (channel == 15 || channel == 39) continue;
+    expect(norman_rf::relay_output_channel(channel) == -1, "unsupported/terminal channel never forwarded");
+  }
+  int channel = 15;
+  for (int hop = 0; hop < 3; ++hop) channel = norman_rf::relay_output_channel(channel);
+  expect(channel == -1, "chain terminates after two hops");
+  norman_rf::RelayCache source, first, second;
+  expect(source.admit(kSyntheticFrame, 0) == norman_rf::RelayDecision::eligible, "origin reserves its own frame");
+  expect(first.admit(kSyntheticFrame, 10) == norman_rf::RelayDecision::eligible, "first bridge forwards unchanged frame");
+  expect(second.admit(kSyntheticFrame, 20) == norman_rf::RelayDecision::eligible, "second bridge forwards unchanged frame");
+  expect(source.admit(kSyntheticFrame, 30) == norman_rf::RelayDecision::duplicate, "origin suppresses returning echo");
+  expect(first.admit(kSyntheticFrame, 40) == norman_rf::RelayDecision::duplicate, "cross-channel echo suppressed");
+}
+
 }  // namespace
 
 int main() {
@@ -180,6 +198,7 @@ int main() {
   test_transmit_boundary();
   test_learned_profile();
   test_relay_cache();
+  test_forwarding_path();
   if (failures != 0) {
     std::cerr << failures << " protocol test(s) failed\n";
     return 1;

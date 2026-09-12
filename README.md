@@ -9,7 +9,17 @@ That integration's RF candidate uses this bridge without calling the hub. Its
 existing HTTP hub controls remain separate; neither path provides verified
 physical shutter position through the RF prototype.
 
-## Current state: 0.8.0 experimental; native room repeater qualification in progress
+## Current state: 0.9.0 experimental; local room tests passed
+
+Version 0.9 adds bounded forwarding of bridge-originated commands: an enabled
+relay scans channels 15 and 39, forwarding 15 to 39 or 39 to 59. Channel 59 is
+terminal and exact-frame echoes are suppressed. This is not an unlimited mesh.
+Both prototypes have the update. Camera observation confirmed individual
+close/open controls for five office sections and four lounge panels, followed
+by a successful whole-room close/open for each room using its local ESP.
+Another ESP also received and forwarded a matching bridge-originated frame.
+The original Norman hardware remained powered: isolated ESP-only delivery and
+reliable range extension are still unqualified. See [current evidence](docs/rf-research.md).
 
 The connected Freenove ESP32-WROOM board has an nRF24-compatible PA/LNA attached.
 It provides:
@@ -29,11 +39,13 @@ Direct open/down-close/up-close were physically confirmed on the initial pilot,
 including HA-native actions. The firmware now supports32 independent target slots;
 14 real section profiles in3 rooms are captured and persisted. The HA candidate
 creates section and room covers with interleaved batches of up to8 targets.
-All five study sections passed the previous sequential room test. Both fixed-order
-0.7.0 and rotating-order 0.7.1 batches moved only one of five in watched trials,
-despite all five commands appearing in radio captures. Do not treat the current
-batch room covers as working room control. Native whole-room signalling remains
-under investigation. Whole-house physical qualification is separate from
+Earlier fixed-order0.7.0 and rotating-order0.7.1 batches moved only one of five
+study sections in watched trials. On12September, the existing interleaved
+scheduler passed five-section office and four-panel lounge tests from their
+respective local bridges. This is one successful close/open pair per room,
+not prolonged reliability or simultaneous motor-start qualification. Generating
+native whole-room packets remains under investigation; these room controls use
+learned individual commands. Whole-house qualification is separate from
 commissioning. Channel39→59 relay was
 observed with Wi-Fi connected and disconnected. Factory defaults cannot send.
 
@@ -61,18 +73,20 @@ also reported success for the matching ESP-relay-disabled Close. These
 placements have not demonstrated added range or exclusive ESP contribution.
 A complete original USB repeater replacement still requires reliable native
 room operation, independent RF attribution and controlled range/reliability
-comparisons. Only the first prototype has the RF evidence described above.
-A second board now has matching firmware and learned profiles, with relay
-policy and profiles verified after reboot; its own over-the-air and physical
-tests remain pending. Neither is a secured customer release.
+comparisons. Both boards now have matching firmware and learned profiles,
+with relay policy and profiles verified after reboot. Each has passed local
+individual and room commands under camera observation. This does not establish
+repeater-only delivery at every placement. Neither is a secured customer release.
 
-Individual delivery is also not fully reliable: a later direct ESP Open
+Historical individual delivery was also unreliable: a direct ESP Open
 completed its100-copy burst but the owner reported the section stayed closed.
 Transmit completion is not movement confirmation. Keep the original controls
 available and do not treat this prototype as a finished drop-in replacement.
 
 Hardware details, the actual tested radio marking, power limitations and the
 pin map are in [hardware and wiring](docs/wiring.md), in this same repository.
+The [prototype enclosure base and top](hardware/enclosure/README.md) are also
+included as the owner's original STEP files, with checksums and fit limitations.
 
 ## First flash
 

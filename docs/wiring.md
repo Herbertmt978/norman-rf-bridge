@@ -52,5 +52,9 @@ The PA/LNA board can draw sharp current peaks. Use a dedicated, stable 3.3 V
 regulator and place 100 nF ceramic plus 47–100 µF bulk capacitance at the radio
 connector. Attach the SMA antenna before any transmit-capable firmware is used.
 
+The owner-supplied [enclosure STEP files](../hardware/enclosure/README.md) are
+stored in this repository. Their inclusion does not qualify mechanical fit,
+print settings, electrical clearances or thermal performance.
+
 The mapping assumes the module shield reads `ESP32-WROOM-32E`. Recheck that
 marking before wiring; ESP32-WROVER boards use some pins for PSRAM.

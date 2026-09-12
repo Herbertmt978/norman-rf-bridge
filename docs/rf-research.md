@@ -1,5 +1,69 @@
 # Evidence and current limits
 
+## Camera-observed qualification and ESP-to-ESP forwarding — 12 September 2026
+
+Both prototypes have antennas, USB power and native ESPHome connectivity. One
+is positioned by the downstairs hub and one in the office; an unplug/reconnect
+test confirmed the mapping. Cameras provide independent
+physical observations for the four lounge panels and five motorised office
+sections. Home Assistant's assumed state is not used as a movement result.
+
+The leftmost lounge panel closed and reopened through the hub, with the first
+bridge logging both unchanged39-to59 relay bursts on0.8. It also closed and
+reopened via direct HA-to-ESP commands while both ESP relay policies were off.
+Original repeaters remained powered: this proves hub-independent command
+generation, not original-repeater-free delivery. All lounge panels were
+restored open after these tests.
+
+The old enabled relay listened only on39 while direct ESP commands transmit
+on15. Version0.9 adds scanning of15/39 with bounded15-to39 and39-to59 routing,
+retaining exact learned allowlists and duplicate suppression. Host route/cache
+tests and the pinned ESPHome build pass. Both units retained commissioned
+profiles across OTA. The updated first unit logged hub-originated15-to39
+forwarding and the lounge pilot still closed/reopened through the hub.
+
+The second unit then sent100 copies of an office Top Left command on15. The
+first unit received the matching CRC-valid frame and logged20 unchanged copies
+on39. This is positive ESP-to-ESP forwarding evidence, but the office shutter
+stayed open. A first-bridge direct Bottom Left test also left that section open.
+These initial failures were followed by successful local tests described below;
+range, receive-channel availability and counter acceptance are not yet isolated
+as causes. A logged relay burst alone is not proof of shutter movement.
+
+All five office motorised sections subsequently passed individual direct
+close/open pairs from the office ESP. The whole-office batch closed all five
+at11:56:15UTC and reopened all five at11:56:39UTC. The motorless top-right section
+is excluded. All four lounge panels also passed individual direct close/open
+pairs from the downstairs ESP; the four-panel batch closed all four
+at12:01:05UTC and reopened all four at12:01:23UTC. Both rooms were restored open.
+The scheduler was unchanged: these room actions interleave learned individual
+commands, not a synthesized native-room packet. Camera snapshots confirm end
+positions, not exact or simultaneous motor start times.
+
+Two initial office commands failed before a hub close followed by successful
+direct open/close/open sequences. Only one of those targets adopted a newer
+observed rolling index; another succeeded without adopting the observed index.
+This does not establish a universal stale-counter diagnosis or justify automatic
+resynchronisation. No counter reset or speculative retry was added.
+
+Direct test pairs called only ESPHome actions, not Norman hub services.
+Original hub/repeaters were still powered and could have forwarded those
+signals. Each room has one successful combined close/open pass at this
+placement, not an isolated ESP-only or long-term reliability qualification.
+The owner is retaining the hub and original repeaters for normal operation;
+exclusive RF-path isolation is deferred rather than reported as a pass.
+
+Four bounded30-second R1 Pluto recordings captured their intended command
+windows but decoded no valid Norman frames. The sample-rate and LO readbacks
+were correct. These captures do not independently corroborate RF transmission;
+the stronger current evidence is matching frames in the other ESP's receiver
+log. The Pluto is upstairs in another office, and its new antenna bands are
+not independently identified. All Pluto work remains receive-only.
+
+Native room generation, prolonged room reliability and original-repeater-free
+range tests remain separate qualification items. Historical results below retain their
+original firmware and placement boundaries.
+
 ## Native room receive-only support — 0.8
 
 Three consecutive owner-triggered native study Open requests were captured on

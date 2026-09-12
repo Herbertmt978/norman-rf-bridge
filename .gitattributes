@@ -1,0 +1,2 @@
+# Preserve the supplied CAD originals and their published byte checksums.
+hardware/enclosure/*.step binary

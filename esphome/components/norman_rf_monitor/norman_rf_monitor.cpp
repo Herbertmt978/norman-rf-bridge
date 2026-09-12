@@ -43,7 +43,7 @@ void NormanRfMonitor::setup() {
 void NormanRfMonitor::dump_config() {
   ESP_LOGCONFIG(TAG, "Norman RF Monitor:");
   LOG_PIN("  CE Pin: ", this->ce_pin_);
-  ESP_LOGCONFIG(TAG, "  Mode: %s; learned commands only; relay 39 -> 59", mode_status_.c_str());
+  ESP_LOGCONFIG(TAG, "  Mode: %s; learned commands only; relay 15 -> 39 -> 59", mode_status_.c_str());
   ESP_LOGCONFIG(TAG, "  Radio status: %s", this->hardware_status_.c_str());
   ESP_LOGCONFIG(TAG, "  Registers: %s", this->register_snapshot_.c_str());
 }
@@ -124,14 +124,19 @@ bool NormanRfMonitor::verify_configuration_() {
 }
 
 void NormanRfMonitor::hop_channel_() {
-  if (!this->radio_ready_ || this->tx_active_ || this->relay_enabled()) {
+  if (!this->radio_ready_ || this->tx_active_) {
     return;
   }
 
   // The nRF24L01+ can only retune from standby-I. CE is low during every
   // retune, which preserves the receive-only boundary while RF_CH changes.
   this->ce_pin_->digital_write(false);
-  this->channel_index_ = (this->channel_index_ + 1) % kCandidateChannels.size();
+  // Drain packets on the channel that received them before changing RF_CH.
+  // A matched packet may start a relay, in which case that burst owns the radio.
+  this->poll_radio_();
+  if (this->tx_active_) return;
+  const size_t channel_count = this->relay_enabled() ? 2 : kCandidateChannels.size();
+  this->channel_index_ = (this->channel_index_ + 1) % channel_count;
   this->write_register_(kRegisterRfChannel, kCandidateChannels[channel_index_]);
   this->ce_pin_->digital_write(true);
 }
@@ -344,9 +349,9 @@ bool NormanRfMonitor::set_relay(bool enabled) {
 void NormanRfMonitor::select_receive_channel_() {
   if (!radio_ready_ || tx_active_) return;
   ce_pin_->digital_write(false);
-  if (relay_enabled()) channel_index_ = 1;  // Receive original repeater traffic on 39.
+  if (relay_enabled()) channel_index_ = 0;  // Scan both direct and first-hop traffic.
   write_register_(kRegisterRfChannel, kCandidateChannels[channel_index_]);
-  mode_status_ = relay_enabled() ? "learned_relay_39_to_59" : "monitor_hop_15_39_59";
+  mode_status_ = relay_enabled() ? "learned_relay_15_39_to_39_59" : "monitor_hop_15_39_59";
   ce_pin_->digital_write(true);
 }
 
@@ -361,7 +366,12 @@ void NormanRfMonitor::handle_valid_frame_(const std::array<uint8_t, kPayloadWidt
       if (!panels_[slot].persist()) select_receive_channel_();
     });
   }
-  if (!relay_enabled() || kCandidateChannels[channel_index_] != 39) return;
+  const int input_channel = kCandidateChannels[channel_index_];
+  const int output_channel = norman_rf::relay_output_channel(input_channel);
+  if (!relay_enabled() || output_channel < 0) return;
+  // Do not consume the deduplication entry during cooldown: a subsequent copy
+  // in the incoming burst must remain eligible once the transmitter is ready.
+  if (!can_transmit_()) return;
   const auto decision = relay_cache_.admit(frame, now);
   if (decision == norman_rf::RelayDecision::duplicate) return;
   if (decision == norman_rf::RelayDecision::full) {
@@ -371,11 +381,11 @@ void NormanRfMonitor::handle_valid_frame_(const std::array<uint8_t, kPayloadWidt
     ESP_LOGE(TAG, "Relay cache full; relay stopped until explicitly rearmed");
     return;
   }
-  if (!can_transmit_() || !start_burst_(frame, 59, 20, true)) ++dropped_count_;
+  if (!start_burst_(frame, output_channel, 20, true)) ++dropped_count_;
   else {
     ++relayed_count_;
-    ESP_LOGI(TAG, "Relay accepted panel_slot=%d relay_slot=%d frame_crc=%02x%02x; unchanged 39 -> 59",
-             slot, match.relay_slot, frame[28], frame[29]);
+    ESP_LOGI(TAG, "Relay accepted panel_slot=%d relay_slot=%d frame_crc=%02x%02x; unchanged %d -> %d",
+             slot, match.relay_slot, frame[28], frame[29], input_channel, output_channel);
   }
 }
 
