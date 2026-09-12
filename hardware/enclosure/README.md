@@ -18,11 +18,15 @@ SHA256 checksums:
 4fdfd57ec9b67c29abea7e3dbea5255121f62da969045b637946aaa0161d31f8  Print Top Final.step
 ```
 
+The owner confirmed on12September2026 that the enclosure has been printed,
+fit-tested and works with the prototype hardware. This is owner-confirmed
+mechanical fit, not an independent electrical, thermal or product certification.
+
 Import these into a STEP-capable CAD application, inspect the dimensions and
-export a mesh supported by your slicer. Do not assume the filenames establish
-a tested final product: assembly fit, fastening, print orientation, material,
-wall strength, electrical clearance and thermal performance are not qualified
-by adding these files. No print settings or STL files are supplied yet.
+export a mesh supported by your slicer. Printer settings, material and fastening
+details have not been recorded here; no STL files are supplied yet. Verify fit
+for any hardware or printing variation and check electrical clearances and
+thermal performance for the intended installation.
 
 Check fit against the actual [board, radio and wiring](../../docs/wiring.md).
 Keep the USB connector accessible and both the ESP32 antenna area and the

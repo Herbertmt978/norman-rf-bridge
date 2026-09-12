@@ -94,8 +94,9 @@ that first-hop forwarding. Exclusive ESP range extension and reliable delivery
 without original repeaters are still unqualified. A dedicated
 radio-only Product B image, physical commissioning control,
 qualified enclosure and production fixture remain future work. Owner-supplied
-STEP enclosure designs are stored under hardware/enclosure, with fit and print
-qualification still pending. It is not yet a universal
+STEP enclosure designs are stored under hardware/enclosure; the owner confirms
+a printed enclosure fits and works. Broader product qualification is still
+pending. It is not yet a universal
 Norman replacement that can be sold without installation-specific commissioning.
 
 Product A* adds HA control and diagnostics through ESPHome while keeping the

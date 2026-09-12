@@ -53,8 +53,9 @@ regulator and place 100 nF ceramic plus 47–100 µF bulk capacitance at the rad
 connector. Attach the SMA antenna before any transmit-capable firmware is used.
 
 The owner-supplied [enclosure STEP files](../hardware/enclosure/README.md) are
-stored in this repository. Their inclusion does not qualify mechanical fit,
-print settings, electrical clearances or thermal performance.
+stored in this repository. The owner confirms the printed enclosure fits and
+works with the prototype. Print settings, electrical clearances and thermal
+performance are not separately documented or qualified.
 
 The mapping assumes the module shield reads `ESP32-WROOM-32E`. Recheck that
 marking before wiring; ESP32-WROVER boards use some pins for PSRAM.
