@@ -340,3 +340,49 @@ Original hub/repeaters remained powered throughout. Exact-copy replays can be
 suppressed by other bridges' duplicate caches; these tests do not prove every
 RF hop repeats again. All tested shutters were returned open. Raw captures,
 household images and installation identities remain outside the public repo.
+
+## Automatic bursts and direct HA schedules — 12 September 2026
+
+The owner requested that the later identical bursts happen on the ESP without
+manual intervention. Firmware 0.9.2 uses the existing cache and radio scheduler:
+two extra bursts at least 20 seconds apart, expiring 60 seconds after the
+original start. A separate persistent HA switch defaults ON. Only that policy
+is persisted, never the pending command. The manual action shares the budget.
+No additional rolling counter is reserved for a repeat. Cancellation and
+fault behaviour are described in [commissioning](commissioning.md#automatic-command-repeats).
+
+Both prototypes received the same pinned ESPHome 2026.4.1 build. Native reads
+before and after OTA showed all 14 target records, including their counters,
+unchanged on each. Both booted ready, relay enabled, automatic policy ON and
+zero pending/started automatic bursts.
+
+One HA Close was sent to each local room cover, with no manual repeat action:
+
+| Room | Early camera observation | After both automatic bursts | New Open |
+| --- | --- | --- | --- |
+| Office | Four of five closed; Bottom Left stayed open | Still four of five closed | All five open |
+| Lounge | Three of four closed; second from camera-left stayed open | All four closed | All four open |
+
+Each board logged exactly two automatic bursts about 20 seconds apart. Both
+Open commands also completed their automatic budgets. No transmitter fault
+was logged during these bounded recordings, but this is not a diagnosis or
+fix for the earlier fault. This run recovered a lounge miss and did not
+recover the office miss. The original hub and repeaters remained powered.
+
+The office opt-out test sent another Open, then disabled automatic repeats
+before its due time. Pending work cleared and the started-repeat count did
+not increase. After the preference had time to save, a reboot retained OFF
+with no cached command. Re-enabling did not revive it; the policy was returned
+to ON for normal use. The unit tests cover expiry, busy-radio deferral,
+counter/profile conflicts, shared manual budget and clock wrap.
+
+The owner also explicitly requested moving sunrise/sunset off hold. The
+existing HA automation now uses local office/lounge RF room controls and is
+enabled, with the same sun triggers and a five-second gap after the office
+action. Both branches passed isolated HA execution tests with fake cover
+services on the pinned and cached-latest test environments; the saved live
+configuration and enabled state were then read back. The physical tests above
+exercise the real covers, not a naturally occurring sunrise or sunset.
+The prior automation is backed up; phone-app schedules were not changed.
+This is experimental daily use at the owner's request, not a new claim of
+reliable unattended or isolated ESP-only operation.

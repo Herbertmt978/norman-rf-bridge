@@ -4,8 +4,8 @@
 
 namespace esphome::norman_rf_monitor {
 
-// Volatile, explicit retry of the last locally originated command. Never learns
-// from RF, reserves another counter, survives reboot, or schedules itself.
+// One volatile budget for manual and scheduled repeats of the last local command.
+// Never learns authority from RF, reserves another counter, or survives reboot.
 class CommandRepeat {
  public:
   void clear() { remaining_ = 0; }
@@ -25,14 +25,19 @@ class CommandRepeat {
     identities_ = identities;
     frames_ = frames;
     created_ms_ = now;
+    last_attempt_ms_ = now;
     remaining_ = 2;
   }
 
   bool take(const std::vector<int32_t> &slots, const std::vector<int32_t> &positions,
             const std::vector<std::string> &identities,
             const std::array<LearnedPanel, 32> &panels, uint32_t now, BatchFrames &frames) {
-    if (remaining_ == 0 || static_cast<uint32_t>(now - created_ms_) >= 60000 ||
-        slots != slots_ || positions != positions_ || identities != identities_) return false;
+    if (remaining_ == 0) return false;
+    if (static_cast<uint32_t>(now - created_ms_) >= 60000) {
+      clear();
+      return false;
+    }
+    if (slots != slots_ || positions != positions_ || identities != identities_) return false;
     for (size_t i = 0; i < slots_.size(); ++i) {
       const auto &panel = panels[slots_[i]];
       if (!panel.ready() || panel.profile_id() != identities_[i] ||
@@ -42,8 +47,23 @@ class CommandRepeat {
       }
     }
     --remaining_;  // An attempted repeat consumes its budget, even on radio failure.
+    last_attempt_ms_ = now;
     frames = frames_;
     return true;
+  }
+
+  bool take_due(const std::array<LearnedPanel, 32> &panels, uint32_t now,
+                bool radio_eligible, BatchFrames &frames, size_t &count) {
+    if (static_cast<uint32_t>(now - created_ms_) >= 60000) clear();
+    if (!radio_eligible || remaining_ == 0 ||
+        static_cast<uint32_t>(now - last_attempt_ms_) < 20000) return false;
+    if (!take(slots_, positions_, identities_, panels, now, frames)) return false;
+    count = slots_.size();
+    return true;
+  }
+
+  uint8_t remaining(uint32_t now) const {
+    return static_cast<uint32_t>(now - created_ms_) < 60000 ? remaining_ : 0;
   }
 
   void observe(const norman_rf::Frame &frame) {
@@ -62,6 +82,7 @@ class CommandRepeat {
   BatchFrames frames_{};
   std::array<int, kBatchCapacity> indices_{};
   uint32_t created_ms_{0};
+  uint32_t last_attempt_ms_{0};
   uint8_t remaining_{0};
 };
 

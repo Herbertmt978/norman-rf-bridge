@@ -53,6 +53,47 @@ int main() {
   repeat.remember(slots, positions, ids, original, panels, 1000);
   repeat.observe(panels[1].next(100));
   check(!repeat.take(slots, positions, ids, panels, 2000, output), "different observed code cancels same endpoint");
+
+  // Deterministic background scheduling, sharing the manual cache and budget.
+  size_t count = 0;
+  CommandRepeat automatic;
+  check(!automatic.take_due(panels, 21000, true, output, count), "boot has no automatic work");
+  automatic.remember(slots, positions, ids, original, panels, 1000);
+  check(automatic.remaining(1000) == 2, "two repeats scheduled by original command");
+  check(!automatic.take_due(panels, 20999, true, output, count), "not before twenty seconds");
+  check(!automatic.take_due(panels, 21000, false, output, count), "busy or unsuccessful radio cannot repeat");
+  check(automatic.take_due(panels, 21000, true, output, count), "first automatic repeat due");
+  check(count == 2 && output == original, "automatic whole-batch bytes unchanged");
+  check(!automatic.take_due(panels, 40999, true, output, count), "no compressed second burst");
+  check(automatic.take_due(panels, 41000, true, output, count), "second automatic repeat due");
+  check(automatic.remaining(41000) == 0, "automatic budget exhausted");
+  check(!automatic.take(slots, positions, ids, panels, 42000, output), "manual cannot exceed automatic budget");
+  check(!automatic.take_due(panels, 61000, true, output, count), "no third scheduled repeat");
+  automatic.remember(slots, positions, ids, original, panels, 1000);
+  check(automatic.take(slots, positions, ids, panels, 15000, output), "manual uses shared budget");
+  check(!automatic.take_due(panels, 34999, true, output, count), "manual postpones next automatic burst");
+  check(automatic.take_due(panels, 35000, true, output, count), "automatic uses final shared allowance");
+  automatic.remember(slots, positions, ids, original, panels, 1000);
+  check(!automatic.take_due(panels, 39000, false, output, count), "busy radio postpones without consuming");
+  check(automatic.take_due(panels, 40000, true, output, count), "delayed first burst accepted");
+  check(automatic.take_due(panels, 60000, true, output, count), "twenty seconds after delayed burst");
+  automatic.remember(slots, positions, ids, original, panels, 1000);
+  check(!automatic.take_due(panels, 61000, false, output, count), "expiry clears even while ineligible");
+  check(!automatic.take_due(panels, 21000, true, output, count), "expired work cannot revive on clock wrap");
+  automatic.remember(slots, positions, ids, original, panels, UINT32_MAX - 10000);
+  check(!automatic.take_due(panels, 9998, true, output, count), "automatic wrap delay boundary");
+  check(automatic.take_due(panels, 9999, true, output, count), "automatic millis wrap supported");
+  automatic.clear();
+  check(!automatic.take_due(panels, 29999, true, output, count), "new command, disable or fault cancels pending work");
+  automatic.remember(slots, positions, ids, original, panels, 1000);
+  automatic.clear();  // Policy setter also clears a manual-only cached command on enable.
+  check(!automatic.take_due(panels, 21000, true, output, count), "enabling policy cannot revive an off-period command");
+  automatic.remember(slots, positions, ids, original, panels, 1000);
+  automatic.observe(panels[0].next(37));
+  check(!automatic.take_due(panels, 21000, true, output, count), "observed conflicting command cancels automatic work");
+  check(esphome::persisted == durable_before && esphome::pending == pending_before,
+        "automatic and manual repeats never write learned counters");
+
   repeat.remember(slots, positions, ids, original, panels, 1000);
   check(panels[0].commit_transmit(panels[0].next(100)), "new command changes rolling state");
   check(!repeat.take(slots, positions, ids, panels, 2000, output), "counter advance independently prevents stale replay");

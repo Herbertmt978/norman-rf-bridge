@@ -37,6 +37,7 @@ void NormanRfMonitor::setup() {
   this->ce_pin_->digital_write(true);
   this->set_interval("poll_radio", 1, [this]() { this->poll_radio_(); });
   this->set_interval("hop_channel", kChannelDwellMs, [this]() { this->hop_channel_(); });
+  this->set_interval("automatic_repeat", 200, [this]() { this->repeat_if_due_(); });
   ESP_LOGI(TAG, "Radio verified; learned panel=%s; autonomous relay=%s", YESNO(panels_[0].ready()), YESNO(relay_enabled()));
 }
 
@@ -224,6 +225,7 @@ void NormanRfMonitor::log_payload_if_budgeted_(
 }
 
 void NormanRfMonitor::set_fault_(const std::string &reason) {
+  command_repeat_.clear();
   if (this->ce_pin_ != nullptr) {
     this->ce_pin_->digital_write(false);
   }
@@ -348,6 +350,39 @@ bool NormanRfMonitor::set_relay(bool enabled) {
   return true;
 }
 
+void NormanRfMonitor::set_automatic_repeats(bool enabled) {
+  // The manual diagnostic may cache a command while automatic repeats are OFF.
+  // Enabling must apply to future commands, not revive that cached command.
+  command_repeat_.clear();
+  automatic_repeats_ = enabled;
+}
+
+uint8_t NormanRfMonitor::repeats_remaining() const {
+  return command_repeat_.remaining(millis());
+}
+
+void NormanRfMonitor::repeat_if_due_() {
+  if (!radio_ready_ || relay_fault_) {
+    command_repeat_.clear();
+    return;
+  }
+  if (!automatic_repeats_) return;
+  // Observe any queued conflicting command before deciding to repeat. RX may
+  // start a relay, which keeps priority over this background operation.
+  poll_radio_();
+  BatchFrames frames{};
+  size_t count = 0;
+  if (!command_repeat_.take_due(panels_, millis(),
+                                can_transmit_() && command_success_ && !relay_fault_, frames, count)) return;
+  if (!start_bursts_(frames, count, 15, 100, false)) {
+    command_repeat_.clear();
+    return;
+  }
+  ++automatic_repeat_count_;
+  ESP_LOGI(TAG, "Automatic repeat: unchanged command bytes and rolling indices; targets=%u remaining=%u",
+           static_cast<unsigned>(count), static_cast<unsigned>(repeats_remaining()));
+}
+
 void NormanRfMonitor::select_receive_channel_() {
   if (!radio_ready_ || tx_active_) return;
   ce_pin_->digital_write(false);
@@ -401,8 +436,8 @@ bool NormanRfMonitor::start_burst_(const norman_rf::Frame &frame, int channel, i
 bool NormanRfMonitor::transmit_targets(const std::vector<int32_t> &slots,
                                      const std::vector<int32_t> &positions,
                                      const std::vector<std::string> &identities) {
-  if (!can_transmit_()) return false;
   command_repeat_.clear();
+  if (!can_transmit_()) return false;
   BatchFrames frames{};
   if (!prepare_target_batch(panels_, slots, positions, identities, frames)) return false;
   if (!start_bursts_(frames, slots.size(), 15, 100, false)) return false;
@@ -459,6 +494,8 @@ bool NormanRfMonitor::start_bursts_(const BatchFrames &frames, size_t count, int
 }
 
 bool NormanRfMonitor::transmit_targets_json(const std::string &request, bool repeat) {
+  // Even a rejected newer command must not leave old background work pending.
+  if (!repeat) command_repeat_.clear();
   if (request.size() > 2048 || !can_transmit_()) return false;
   return json::parse_json(request, [this, repeat](JsonObject root) -> bool {
     if (root.size() != 3 || !root["slots"].is<JsonArray>() || !root["positions"].is<JsonArray>() ||

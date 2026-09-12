@@ -1,156 +1,177 @@
 # Norman RF Bridge
 
-Experimental ESP32/nRF24 firmware for direct Norman Gen1 shutter control and
-bounded autonomous repeating, with optional Home Assistant/ESPHome features.
+Control Norman Gen1 shutters from Home Assistant using an ESP32 and a small
+2.4 GHz radio. Plug it into USB power and leave it near the shutters. Once
+set up, it can send commands directly and repeat learned Norman traffic.
 
-This project is deliberately separate from
-[`Norman-HA-Integration`](https://github.com/Herbertmt978/Norman-HA-Integration).
-That integration's RF candidate uses this bridge without calling the hub. Its
-existing HTTP hub controls remain separate; neither path provides verified
-physical shutter position through the RF prototype.
+The aim is to replace the Norman hub's control role and its USB repeaters with
+hardware you can build, update and use with ESPHome. Direct control and radio
+forwarding both work on the prototypes. This is still an experimental project,
+not a universal plug-in replacement: commissioning is manual and some commands
+still miss panels. Keep the original controls available while testing.
 
-## Current state: experimental; room delivery remains intermittent
+## What it does
 
-Version 0.9 adds bounded forwarding of bridge-originated commands: an enabled
-relay scans channels 15 and 39, forwarding 15 to 39 or 39 to 59. Channel 59 is
-terminal and exact-frame echoes are suppressed. This is not an unlimited mesh.
-Both prototypes have the update. Camera observation confirmed individual
-close/open controls for five office sections and four lounge panels, followed
-by a successful whole-room close/open for each room using its local ESP.
-Another ESP also received and forwarded a matching bridge-originated frame.
-The original Norman hardware remained powered: isolated ESP-only delivery and
-reliable range extension are still unqualified. See [current evidence](docs/rf-research.md).
+**Control shutters from HA.** The companion
+[Norman integration](https://github.com/Herbertmt978/Norman-HA-Integration)
+adds individual section and whole-room Open/Close controls. HA sends a Wi-Fi
+command to the local ESP; the nRF24-compatible module sends the shutter command.
+That path doesn't call the Norman hub or need its password. The integration's
+RF transport is currently a pre-release feature; follow its
+[RF setup guide](https://github.com/Herbertmt978/Norman-HA-Integration/blob/Herb/esphome-rf-transport/docs/esphome-rf.md).
 
-Later HA-cover tests reproduced missed sections in both rooms, including when
-rooms were sent sequentially with a five-second gap. A completed radio burst is
-not a shutter acknowledgement. The sunrise/sunset migration is therefore on
-hold. Version0.9.1 adds an explicit diagnostic repeat action; it does not change
-default sending or claim to fix delivery. See [repeat testing](docs/commissioning.md#explicit-identical-command-repeat).
+**Work as a USB-powered repeater.** After learning the installation's commands
+and enabling relay mode, the board listens for matching traffic and forwards
+it automatically. It can forward commands from the Norman hardware or another
+ESP bridge. This runs locally, including when Wi-Fi or HA is unavailable.
+It isn't an unrestricted repeater for every packet it hears.
 
-The connected Freenove ESP32-WROOM board has an nRF24-compatible PA/LNA attached.
-It provides:
+**Repeat its own commands.** Firmware **0.9.2-experimental** sends up to two
+extra bursts after a direct command, normally at about 20 and 40 seconds.
+They use the same command bytes and rolling codes, not three different
+commands. Each board has an **RF automatic command repeats** switch in HA.
+It starts enabled and remembers your choice. Reboots don't replay old commands.
 
-- native ESPHome API discovery in Home Assistant;
-- USB and Bluetooth Improv plus fallback-access-point Wi-Fi provisioning;
-- OTA updates and safe-mode recovery;
-- an active Home Assistant Bluetooth proxy;
-- uptime, Wi-Fi, firmware, and reset diagnostics;
-- SPI-backed radio detection and configuration readback;
-- bounded receive/transmit/relay/fault counters;
-- explicitly learned open/close-down/optional close-up commands;
-- persistent rolling state reserved before a direct RF burst; and
-- opt-in autonomous repeating of learned commands, restored from USB power.
+**Stay useful as an ESPHome device.** The image includes an active Bluetooth
+proxy, Wi-Fi signal and uptime diagnostics, radio counters, and OTA updates.
+You can add supported sensors on spare pins once power and pin conflicts are
+checked. The external radio is for Norman RF; it isn't a Wi-Fi adapter or a
+general-purpose packet sniffer.
 
-Direct open/down-close/up-close were physically confirmed on the initial pilot,
-including HA-native actions. The firmware now supports32 independent target slots;
-14 real section profiles in3 rooms are captured and persisted. The HA candidate
-creates section and room covers with interleaved batches of up to8 targets.
-Earlier fixed-order0.7.0 and rotating-order0.7.1 batches moved only one of five
-study sections in watched trials. On12September, the existing interleaved
-scheduler passed five-section office and four-panel lounge tests from their
-respective local bridges. This is one successful close/open pair per room,
-followed by further passes and failures, not prolonged reliability or simultaneous
-motor-start qualification. Generating
-native whole-room packets remains under investigation; these room controls use
-learned individual commands. Whole-house qualification is separate from
-commissioning. Channel39→59 relay was
-observed with Wi-Fi connected and disconnected. Factory defaults cannot send.
+## Where it fits
 
-## Demonstrated repeater functionality
+```text
+HA dashboard or automation
+        │ Wi-Fi / ESPHome API
+        ▼
+ESP32 + nRF24 radio ── Norman RF ──► shutters
+        │
+        └── another commissioned ESP can repeat matching RF
 
-The tested USB-powered ESP bridge has demonstrated autonomous forwarding of
-learned individual-panel commands from channel39 to59, including while its
-Wi-Fi was disabled. The saved enable policy survives reboot; startup itself
-sends no movement command. This is positive evidence of repeating on one
-prototype, not qualification of every board or installation.
+Norman hub / original repeater ── RF ──► ESP repeater ── RF ──► shutters
+```
 
-Version0.8 adds a separate receive-only allowlist for native room operations.
-The study's native Open/Close entries are commissioned and survive reboot;
-UART now records both fresh native commands being accepted and forwarded
-39→59, with 20 copies each and no individual-counter changes. In the watched
-room trial, the owner reported that Top Left did not move. A subsequent direct
-ESP close/open moved that section successfully. This is partial native-room
-evidence, not a room reliability pass or a proven diagnosis of the miss.
-These entries never generate counters, create HA motor covers or enter
-individual room batches.
+Putting a directly controlled ESP in a distant room can avoid relying on the
+hub's radio reaching that room. HA reaches the ESP over Wi-Fi instead. A board
+used only as a repeater still needs to hear the upstream transmitter, so its
+placement matters.
 
-A later one-section Close/Open trial succeeded with all original repeaters
-reported unplugged, and the ESP logged both relay bursts. However, the owner
-also reported success for the matching ESP-relay-disabled Close. These
-placements have not demonstrated added range or exclusive ESP contribution.
-A complete original USB repeater replacement still requires reliable native
-room operation, independent RF attribution and controlled range/reliability
-comparisons. Both boards now have matching firmware and learned profiles,
-with relay policy and profiles verified after reboot. Each has passed local
-individual and room commands under camera observation. This does not establish
-repeater-only delivery at every placement. Neither is a secured customer release.
+In the test installation, the existing sunrise/sunset automation now uses the
+office and lounge ESP controls. This was an owner-approved move to experimental
+daily use, not a claim that every delivery issue has been solved. HA owns the
+schedule; the ESP owns the RF transmission and its bounded extra bursts.
+Schedules in the Norman phone app must be disabled separately to avoid competing
+commands. Removing the hub also means losing its app-based control and schedules.
 
-Historical individual delivery was also unreliable: a direct ESP Open
-completed its100-copy burst but the owner reported the section stayed closed.
-Transmit completion is not movement confirmation. Keep the original controls
-available and do not treat this prototype as a finished drop-in replacement.
+## Hardware
 
-Hardware details, the actual tested radio marking, power limitations and the
-pin map are in [hardware and wiring](docs/wiring.md), in this same repository.
-The [prototype enclosure base and top](hardware/enclosure/README.md) are also
-included as the owner's original STEP files, with checksums and fit limitations.
+The two prototypes use the same simple assembly:
 
-## First flash
+| Part | Used here |
+| --- | --- |
+| ESP32 | [Freenove ESP32 board kit](https://www.amazon.co.uk/dp/B0C9THDPXP), ESP32-WROOM-32E, 4 MiB flash, USB-C |
+| Radio | [nRF24L01+ PA/LNA module with SMA antenna](https://www.amazon.co.uk/dp/B0DK2Z6C7K); the photographed chip is marked SI24R1, an nRF24-compatible part |
+| Antenna | One attached 2.4 GHz antenna per radio |
+| Wiring and power | Jumper leads and USB power; the radio takes 3.3 V from the ESP board in these prototypes |
+| Enclosure | [Printable base and top](hardware/enclosure/README.md), supplied as STEP files; the owner has printed them and confirmed the fit |
 
-1. Test with `scripts/test-protocol.ps1`; build with `scripts/build-stage1.ps1`.
-2. Flash a board with `scripts/flash-stage1.ps1 -Port COM3` (or its current
-   serial port).
-3. Provision the board from this Windows PC with
-   `scripts/provision-stage0.ps1 -Port COM3`, use USB/Bluetooth Improv, or join
-   the fallback access point named `Norman RF Bridge Setup`.
-4. Add the discovered ESPHome device in Home Assistant.
+These are the owner's purchase links, not guarantees about future seller stock.
+See [hardware and wiring](docs/wiring.md) for the full GPIO map and power advice.
+**Never connect the bare radio to 5 V. Fit its antenna before transmitting.**
+The PA/LNA supply has not been qualified for a finished product; a stable
+dedicated 3.3 V supply and local decoupling are recommended for further testing.
 
-Build products are directed to `D:\CodexBuild\norman-rf-bridge` so large toolchain
-caches do not enter Dropbox or the Git worktree. Builds and flashes deliberately
-require the tested ESPHome version, 2026.4.1.
+## Will it work with my shutters?
 
-`scripts/package-experimental.ps1` creates factory/OTA binaries, source ZIP,
-ESP Web Tools manifest and SHA256 inventory under the external build root. It
-refuses a dirty checkout unless `-AllowDirty` explicitly labels the development
-snapshot. Historical `stage1` script names now refer to the current RF image.
-The separate `*-stage0.ps1` scripts target `esphome/stage0-recovery.yaml`, the
-original radio-free recovery image; do not use them for an RF upgrade.
+It is a reasonable candidate for another installation using the same Norman
+Gen1 radio protocol. It has not yet been qualified in a second home or across
+all Norman motor generations. The Norman name alone isn't enough to establish
+compatibility, and the HA integration's support for other hub generations
+doesn't mean this radio firmware supports them.
 
-The bench image is unencrypted, has unauthenticated OTA and an open fallback
-setup AP. Keep it on a trusted local network. A sellable release still requires
-owner-specific credentials, a pinned public adoption package, product testing
-and a supported update/recovery lifecycle. The factory image contains no learned
-customer commands: commission each installation separately.
+Each motorised section needs its own learned command profile. A shutter with
+independent upper and lower sections therefore needs two profiles. The sections
+share a radio protocol; they don't each require a completely different decoder.
+What changes is the command's identity/selector, its supported operation and its
+rolling state. The firmware contains the protocol logic, **not this home's
+shutter codes**.
 
-## Commissioning and scope
+**You shouldn't need a Pluto for a compatible installation.** The ESP/nRF24
+receiver can log the supported packets from your existing hub or controller.
+The remaining job is to associate captures with the panel and direction you
+actually operated, validate them, and save them as that panel's profile. This
+is currently a technical, manual process, not a pairing wizard. A Pluto or
+another suitable SDR is useful if your system uses different radio settings,
+the logger sees nothing, or the protocol needs further investigation.
 
-Use `scripts/bridge-control.py` to commission each captured open/preferred-close
-pair with a stable slot, section name and room. An optional opposite closing
-endpoint can be learned separately. The ESP owns templates/counters and global
-relay policy; HA stores only explicit target bindings. See the commissioning guide.
+Start with [compatibility and learning your shutters](docs/compatibility.md).
+Don't copy someone else's frames or an old full-flash backup of a commissioned
+board. Matching the protocol is not the same as learning your installation.
 
-Arbitrary position, stop, exhaustive counter recovery,
-range/coexistence qualification and secured customer provisioning remain open.
-Use only one direct-command bridge per learned controller identity until
-multi-controller counter coordination is qualified. Repeating freshly received
-frames is distinct from generating commands. Never clone stale rolling state.
+## Getting started
 
-See [product-architecture.md](docs/product-architecture.md),
-[wiring.md](docs/wiring.md), [commissioning.md](docs/commissioning.md), and
-[rf-research.md](docs/rf-research.md).
+1. Assemble the board using the [verified wiring](docs/wiring.md).
+2. Run `scripts/test-protocol.ps1`, then `scripts/build-stage1.ps1` using the
+   tested ESPHome version, **2026.4.1**.
+3. Flash with `scripts/flash-stage1.ps1 -Port COM3`, replacing COM3 with the
+   board's actual port. Provision Wi-Fi through USB/Bluetooth Improv or the
+   temporary `Norman RF Bridge Setup` access point.
+4. Add the discovered ESPHome device in HA. Confirm the radio reports ready.
+5. [Capture and commission](docs/commissioning.md) each section, then verify
+   Open and its preferred closing direction while watching the shutter.
+6. Add the Norman integration's experimental RF transport and select the rooms
+   this bridge should control. Enable autonomous relay if you also want repeating.
 
-## Protocol core
+A new factory image has no learned commands and cannot move or repeat shutters
+until commissioned. Once configured, ordinary USB power is enough; a permanent
+USB connection to a computer is not required. HA control needs Wi-Fi, local
+repeating does not.
 
-`protocol/` contains framework-independent C++ for the facts already supported by
-the August 2026 proof of concept: the observed 30-byte application frame, Norman's
-application CRC, and the reported rolling-code permutation. The actual nRF payload
-may be 32 bytes with two trailing pad bytes, so monitor firmware must capture the
-full radio payload before normalising it. Run `scripts/test-protocol.ps1` for fresh
-host tests. No captured remote or shutter identifiers are stored in this repository.
+The scripts currently use Windows/PowerShell and put build output under
+`D:\CodexBuild\norman-rf-bridge`. `scripts/package-experimental.ps1` packages
+factory/OTA binaries, source and an ESP Web Tools manifest with checksums.
+This is a developer packaging tool, not a hosted one-click installer.
+The separate `*-stage0.ps1` scripts are for the older radio-free recovery image,
+not normal RF upgrades.
 
-## Licence and provenance
+## What has been tested, and what hasn't
 
-The RF research builds on the GPL-3.0-or-later `NRF24_Sniff` work shared in the
-Home Assistant community thread and the original Yveaux NRF24 Sniffer. This
-project is therefore GPL-3.0-or-later. See [LICENSE](LICENSE) and
-[rf-research.md](docs/rf-research.md).
+Both boards have moved their local shutters through HA: five office sections
+and four lounge panels, individually and as room groups. Learned repeating has
+also been observed, including a Wi-Fi-disconnected test. The original Norman
+hardware stayed powered during the recent room trials, so those results don't
+prove that every RF path used only ESP devices.
+
+The latest automatic-repeat test closed all four lounge panels, but still left
+one of five office sections open. A subsequent Open restored both rooms. An
+earlier local transmitter fault also remains unexplained. Extra bursts can
+recover some misses; they cannot guarantee reception or fix every fault.
+
+HA shows the requested state after the first successful burst. There is no
+motor acknowledgement or measured position, so a green HA action is not proof
+that a panel moved. Room controls use interleaved individual commands, not a
+native whole-room broadcast, and the motors may start at different times.
+There are 32 profile slots per bridge and up to eight sections in one room batch.
+Stop, arbitrary percentage positioning and battery feedback aren't implemented.
+
+The current bench image has **no API encryption or OTA authentication** and an
+open fallback setup AP. Use it only on a trusted local network. Customer-ready
+provisioning, longer reliability tests and product/radio compliance are still
+work to do before selling it as a finished replacement.
+
+## More detail
+
+- [Commissioning, repeat settings and recovery](docs/commissioning.md)
+- [Compatibility and per-panel learning](docs/compatibility.md)
+- [Hardware and GPIO wiring](docs/wiring.md)
+- [Enclosure CAD files and checksums](hardware/enclosure/README.md)
+- [How the firmware works](docs/product-architecture.md)
+- [RF captures, test results and known failures](docs/rf-research.md)
+
+## Credits and licence
+
+This project builds on the Norman research and Arduino examples shared in the
+[Home Assistant community thread](https://community.home-assistant.io/t/norman-tdbu-blind-control/705405),
+including the `NRF24_Sniff` work and Yveaux's NRF24 Sniffer. It is licensed
+under [GPL-3.0-or-later](LICENSE). This is an independent project, not an
+official Norman product.

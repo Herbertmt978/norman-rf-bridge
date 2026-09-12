@@ -1,6 +1,6 @@
 # Product architecture
 
-## Current implementation: 0.9.0 experimental
+## Current implementation: 0.9.2 experimental
 
 Up to32 explicitly commissioned Gen1 section targets per ESP32. Each has its own
 exact templates/counter and preferred close direction; all share one SPI radio
@@ -14,6 +14,7 @@ physical whole-house acceptance remains distinct from a successful RF burst.
 | `LearnedRelayEndpoint` | Separate79-byte receive-only command/name record per slot; no outgoing counter or motor membership |
 | `match_received_command` | One ambiguity-rejecting classifier across both namespaces; only a panel match may update that panel's observed counter |
 | `NormanRFMonitor` | Radio detection/readback, receive FIFO, direct bursts, relay timing, watchdog and radio-fault handling |
+| `CommandRepeat` | One volatile last-command cache and shared manual/automatic repeat budget; no counter reservation or persisted command queue |
 | ESPHome YAML | Provisioning, HA API, diagnostics, optional Bluetooth and service actions |
 | Norman HA RF adapter | Section and room covers using adopted ESPHome services; one shared serializer, bound target identities, no RF encoding/counter ownership/hub fallback |
 
@@ -28,6 +29,15 @@ same path with one target. A storage failure consumes any earlier reservations
 without transmission or rewind. Batch failure makes all selected states uncertain.
 This copy count follows the locally successful burst test; the
 earlier proposed 1–3-copy limit was not established by measurement.
+
+Version 0.9.2 schedules up to two additional unchanged direct-command bursts,
+at least 20 seconds apart and within 60 seconds of the original start.
+The ESPHome automatic-repeat switch persists the opt-out setting, default ON;
+it does not persist pending commands. A newer command attempt, observed
+conflict, changed profile/counter, disable or radio fault cancels pending work.
+An active burst is not interrupted. Manual repeats use the same budget.
+HA still returns after the first burst; it doesn't provide another retry loop.
+See [repeat policy](commissioning.md#automatic-command-repeats).
 
 Repeating does not generate a counter. While enabled, the receiver scans
 channels15 and39 at20ms nominal dwell. An exact learned command received on15
@@ -130,5 +140,4 @@ extended power-cycle/soak testing, PA/LNA supply qualification, enclosure and
 applicable product/radio compliance. No certification or commercial-readiness
 claim is made.
 
-See [commissioning](commissioning.md), [RF evidence](rf-research.md) and the
-[earlier design](history/2026-09-03-product-architecture.md).
+See [commissioning](commissioning.md) and [RF evidence](rf-research.md).

@@ -10,11 +10,11 @@ installation tools. The separate Norman HA integration consumes its ESPHome API.
 | Controller | Freenove ESP32 development board, ESP32-WROOM-32E shield,4MiB flash, USB-C power/data |
 | Radio | SMA-antenna PA/LNA module sold as nRF24L01+; photographed radio IC is marked SI24R1. Describe it as nRF24-compatible, not verified genuine Nordic silicon. |
 | Antenna | Attached2.4GHz SMA antenna on the radio module |
-| Connections | Jumper-wire SPI prototype using the pin map below; not an enclosure or production PCB |
+| Connections | Jumper-wire SPI prototype using the pin map below; no custom production PCB |
 | Power | USB powers the ESP32 board. The radio requires regulated3.3V and common ground; this prototype has not qualified a production PA/LNA supply. |
 
-One connected unit has been tested. Results do not qualify a second untested
-board, another module vendor, antenna gain, supply or enclosure. Keep installation
+Both prototypes have been tested with their own antennas. Results do not qualify
+another module vendor, antenna gain or supply. Keep installation
 identifiers and private commissioning captures outside this source repository.
 
 ## Parts used in the prototype

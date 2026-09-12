@@ -1,7 +1,7 @@
 substitutions:
   device_name: norman-rf-bridge
   friendly_name: Norman RF Bridge
-  project_version: 0.9.1-experimental
+  project_version: 0.9.2-experimental
 
 esphome:
   name: ${device_name}
@@ -121,6 +121,9 @@ api:
             data: !lambda |-
               root["protocol_version"] = 3;
               root["batch_capacity"] = 8;
+              root["automatic_repeats"] = id(rf_monitor).automatic_repeats();
+              root["repeats_remaining"] = id(rf_monitor).repeats_remaining();
+              root["automatic_repeat_count"] = id(rf_monitor).automatic_repeat_count();
               root["ready"] = id(rf_monitor).radio_ready();
               root["relay_enabled"] = id(rf_monitor).relay_enabled();
               root["capacity"] = 32;
@@ -487,6 +490,16 @@ button:
     entity_category: diagnostic
 
 switch:
+  - platform: template
+    name: RF automatic command repeats
+    entity_category: config
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    turn_on_action:
+      - lambda: id(rf_monitor).set_automatic_repeats(true);
+    turn_off_action:
+      - lambda: id(rf_monitor).set_automatic_repeats(false);
+
   - platform: template
     name: RF autonomous relay
     entity_category: config

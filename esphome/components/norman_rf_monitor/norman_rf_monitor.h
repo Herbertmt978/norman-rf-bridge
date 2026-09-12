@@ -50,6 +50,10 @@ class NormanRfMonitor : public Component,
   bool configure_close_up(const std::string &frame);
   bool transmit_command(int position);
   bool set_relay(bool enabled);
+  void set_automatic_repeats(bool enabled);
+  bool automatic_repeats() const { return automatic_repeats_; }
+  uint8_t repeats_remaining() const;
+  uint32_t automatic_repeat_count() const { return automatic_repeat_count_; }
   bool relay_enabled() const { return relay_policy_ready_ && relay_requested_ && !relay_fault_; }
   bool panel_ready() const { return panels_[0].ready(); }
   int rolling_index() const { return panels_[0].last_index(); }
@@ -124,6 +128,7 @@ class NormanRfMonitor : public Component,
   void setup_relay_();
   void select_receive_channel_();
   void handle_valid_frame_(const std::array<uint8_t, kPayloadWidth> &payload, uint32_t now);
+  void repeat_if_due_();
 
   GPIOPin *ce_pin_{nullptr};
   bool radio_ready_{false};
@@ -158,6 +163,8 @@ class NormanRfMonitor : public Component,
   bool relay_policy_ready_{false};
   norman_rf::RelayCache relay_cache_;
   CommandRepeat command_repeat_;
+  bool automatic_repeats_{false};  // Restored by the ESPHome policy switch at boot.
+  uint32_t automatic_repeat_count_{0};
   bool relay_fault_{false};
   bool tx_is_relay_{false};
   bool command_success_{false};
