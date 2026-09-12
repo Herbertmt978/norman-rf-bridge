@@ -7,7 +7,7 @@ set up, it can send commands directly and repeat learned Norman traffic.
 The aim is to replace the Norman hub's control role and its USB repeaters with
 hardware you can build, update and use with ESPHome. Direct control and radio
 forwarding both work on the prototypes. This is still an experimental project,
-not a universal plug-in replacement: commissioning is manual and some commands
+not a universal plug-in replacement: setup needs watched learning and some commands
 still miss panels. Keep the original controls available while testing.
 
 ## What it does
@@ -26,8 +26,15 @@ it automatically. It can forward commands from the Norman hardware or another
 ESP bridge. This runs locally, including when Wi-Fi or HA is unavailable.
 It isn't an unrestricted repeater for every packet it hears.
 
-**Repeat its own commands.** Firmware **0.9.2-experimental** sends up to two
-extra bursts after a direct command, normally at about 20 and 40 seconds.
+**Learn and manage profiles in HA.** Firmware **0.10.0-experimental** adds a
+guided flow in the companion integration. Name a section and room, press the
+requested controller actions, and confirm what moved. HA can also learn
+forwarding-only actions, rename/regroup profiles, and remove a selected profile
+with confirmation. Follow the [setup and profile manual](docs/learning.md).
+
+**Repeat its own commands.** Firmware **0.10.0-experimental** sends up to two
+extra full bursts after a direct command, waiting two seconds after each
+successful burst finishes before starting the next.
 They use the same command bytes and rolling codes, not three different
 commands. Each board has an **RF automatic command repeats** switch in HA.
 It starts enabled and remembers your choice. Reboots don't replay old commands.
@@ -100,7 +107,7 @@ shutter codes**.
 receiver can log the supported packets from your existing hub or controller.
 The remaining job is to associate captures with the panel and direction you
 actually operated, validate them, and save them as that panel's profile. This
-is currently a technical, manual process, not a pairing wizard. A Pluto or
+is handled by the new [HA learning flow](docs/learning.md). A Pluto or
 another suitable SDR is useful if your system uses different radio settings,
 the logger sees nothing, or the protocol needs further investigation.
 
@@ -117,10 +124,10 @@ board. Matching the protocol is not the same as learning your installation.
    board's actual port. Provision Wi-Fi through USB/Bluetooth Improv or the
    temporary `Norman RF Bridge Setup` access point.
 4. Add the discovered ESPHome device in HA. Confirm the radio reports ready.
-5. [Capture and commission](docs/commissioning.md) each section, then verify
-   Open and its preferred closing direction while watching the shutter.
-6. Add the Norman integration's experimental RF transport and select the rooms
-   this bridge should control. Enable autonomous relay if you also want repeating.
+5. Add the Norman integration's experimental RF transport, select the bridge
+   and follow [guided learning](docs/learning.md) for each section or relay action.
+6. Select rooms for direct HA control and test their Open/Close while watching.
+   Use Reconfigure later to add, rename, regroup or remove profiles.
 
 A new factory image has no learned commands and cannot move or repeat shutters
 until commissioned. Once configured, ordinary USB power is enough; a permanent

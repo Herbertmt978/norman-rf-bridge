@@ -60,10 +60,14 @@ int main() {
   check(!automatic.take_due(panels, 21000, true, output, count), "boot has no automatic work");
   automatic.remember(slots, positions, ids, original, panels, 1000);
   check(automatic.remaining(1000) == 2, "two repeats scheduled by original command");
-  check(!automatic.take_due(panels, 20999, true, output, count), "not before twenty seconds");
+  check(!automatic.take_due(panels, 20999, true, output, count), "cannot repeat until a successful completion");
+  automatic.completed(19000, true);
+  check(!automatic.take_due(panels, 20999, true, output, count), "two-second quiet gap boundary");
   check(!automatic.take_due(panels, 21000, false, output, count), "busy or unsuccessful radio cannot repeat");
   check(automatic.take_due(panels, 21000, true, output, count), "first automatic repeat due");
   check(count == 2 && output == original, "automatic whole-batch bytes unchanged");
+  check(!automatic.take_due(panels, 41000, true, output, count), "repeat must finish before next gap starts");
+  automatic.completed(39000, true);
   check(!automatic.take_due(panels, 40999, true, output, count), "no compressed second burst");
   check(automatic.take_due(panels, 41000, true, output, count), "second automatic repeat due");
   check(automatic.remaining(41000) == 0, "automatic budget exhausted");
@@ -71,16 +75,20 @@ int main() {
   check(!automatic.take_due(panels, 61000, true, output, count), "no third scheduled repeat");
   automatic.remember(slots, positions, ids, original, panels, 1000);
   check(automatic.take(slots, positions, ids, panels, 15000, output), "manual uses shared budget");
+  automatic.completed(33000, true);
   check(!automatic.take_due(panels, 34999, true, output, count), "manual postpones next automatic burst");
   check(automatic.take_due(panels, 35000, true, output, count), "automatic uses final shared allowance");
   automatic.remember(slots, positions, ids, original, panels, 1000);
+  automatic.completed(6500, true);
   check(!automatic.take_due(panels, 39000, false, output, count), "busy radio postpones without consuming");
   check(automatic.take_due(panels, 40000, true, output, count), "delayed first burst accepted");
-  check(automatic.take_due(panels, 60000, true, output, count), "twenty seconds after delayed burst");
+  automatic.completed(58000, true);
+  check(automatic.take_due(panels, 60000, true, output, count), "two seconds after delayed burst finishes");
   automatic.remember(slots, positions, ids, original, panels, 1000);
   check(!automatic.take_due(panels, 61000, false, output, count), "expiry clears even while ineligible");
   check(!automatic.take_due(panels, 21000, true, output, count), "expired work cannot revive on clock wrap");
   automatic.remember(slots, positions, ids, original, panels, UINT32_MAX - 10000);
+  automatic.completed(7999, true);
   check(!automatic.take_due(panels, 9998, true, output, count), "automatic wrap delay boundary");
   check(automatic.take_due(panels, 9999, true, output, count), "automatic millis wrap supported");
   automatic.clear();
@@ -91,6 +99,10 @@ int main() {
   automatic.remember(slots, positions, ids, original, panels, 1000);
   automatic.observe(panels[0].next(37));
   check(!automatic.take_due(panels, 21000, true, output, count), "observed conflicting command cancels automatic work");
+  automatic.remember(slots, positions, ids, original, panels, 1000);
+  automatic.completed(6500, false);
+  check(automatic.remaining(8500) == 0 && !automatic.take_due(panels, 8500, true, output, count),
+        "failed completion cancels all retries");
   check(esphome::persisted == durable_before && esphome::pending == pending_before,
         "automatic and manual repeats never write learned counters");
 

@@ -65,7 +65,10 @@ $manifest = [ordered]@{
     source_revision=$revision; source_dirty=$dirty; source_files=$after; artifacts=@($artifacts)
     built_at_utc=[DateTime]::UtcNow.ToString('o'); esphome_version='2026.4.1'
     status='experimental-not-a-customer-release'; api_encrypted=$false; ota_authenticated=$false
-    factory_commissioned=$false; maximum_panels=32; native_protocol=3; maximum_batch_targets=8; relay_path='39 -> 59, learned commands only'
+    factory_commissioned=$false; maximum_panels=32; native_protocol=3; maximum_batch_targets=8
+    learning_api_version=1; maximum_relay_profiles=32; profile_management='Home Assistant Reconfigure'
+    repeat_gap_after_completion_ms=2000; maximum_extra_direct_bursts=2
+    relay_path='15 -> 39 -> 59, learned commands only'
 }
 $manifest | ConvertTo-Json -Depth 7 | Set-Content -LiteralPath (Join-Path $destination 'manifest.json') -Encoding utf8
 Write-Output ([pscustomobject]@{Directory=$destination; Version=$version; SourceDirty=$dirty; Artifacts=4})

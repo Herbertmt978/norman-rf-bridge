@@ -1,7 +1,7 @@
 substitutions:
   device_name: norman-rf-bridge
   friendly_name: Norman RF Bridge
-  project_version: 0.9.2-experimental
+  project_version: 0.10.0-experimental
 
 esphome:
   name: ${device_name}
@@ -34,6 +34,14 @@ logger:
 api:
   reboot_timeout: 0s
   actions:
+    - action: rf_learning
+      supports_response: only
+      variables:
+        request_json: string
+      then:
+        - api.respond:
+            data: !lambda id(rf_monitor).learning_request(request_json, root);
+
     # Receive-only endpoint namespace: never creates a direct target or HA cover.
     - action: rf_configure_relay_endpoint
       variables:

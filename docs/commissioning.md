@@ -95,7 +95,7 @@ object has equal-length arrays `slots`, `positions`, `profile_ids`, with1–8
 unique targets. Every identity/endpoint is checked and every counter is durably
 reserved before the first RF packet. The single scheduler sends each target
 once per55ms round, for100 copies each. Any failure leaves all selected physical
-states uncertain. HA does not retry the action. Firmware 0.9.2 can schedule
+states uncertain. HA does not retry the action. Firmware 0.10.0 can schedule
 additional identical bursts after successful local transmission, as described below;
 a transmitter failure cancels them.
 
@@ -144,13 +144,14 @@ There is no physical position or battery feedback through this RF transport.
 
 ### Automatic command repeats
 
-Firmware **0.9.2-experimental** makes extra direct-command bursts automatic.
+Firmware **0.10.0-experimental** changes automatic repeats to a two-second
+quiet gap after each completed burst. Version0.9.2 used20-second start intervals.
 The **RF automatic command repeats** switch on each ESPHome device defaults
 to ON. It is separate from **RF autonomous relay**, which controls forwarding
 received traffic. Either switch can be used without the other.
 
 After a successful local command, the ESP can send up to two more identical
-bursts, normally about 20 and 40 seconds after the first burst starts. Each
+bursts, waiting two seconds after each successful burst finishes. Each
 burst retains the existing 100 copies per target and 55 ms round cadence.
 The extra bursts reuse the original application bytes and rolling indices;
 they don't reserve more counters or write the command back to flash.
@@ -158,7 +159,8 @@ they don't reserve more counters or write the command back to flash.
 The radio must be idle and the previous direct burst must have completed.
 Busy periods defer the next attempt, but the whole budget expires 60 seconds
 after the original start. There is no endless retry loop. Manual repeats share
-the same two-attempt budget and postpone the next automatic attempt by 20 seconds.
+the same two-attempt budget; the next automatic attempt waits two seconds after
+the manual burst finishes.
 
 A newer local command attempt cancels the old pending repeats, even if that
 new attempt is rejected as busy. An already-running burst finishes normally;
@@ -218,7 +220,7 @@ be ignored by a motor that already accepted them, and may still fail if that
 code is unacceptable. Autonomous relay retains its exact-frame duplicate cache:
 a repeated local packet is not promised another forwarding burst at every bridge.
 Observe actual movement and restore the starting state. HA room covers do not
-automatically call this action; firmware 0.9.2 owns the background repeat policy
+automatically call this action; firmware 0.10.0 owns the background repeat policy
 above. Long-term unattended delivery remains unqualified, despite the owner's
 decision to begin using the direct ESP schedules.
 

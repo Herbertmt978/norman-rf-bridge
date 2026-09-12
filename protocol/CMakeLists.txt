@@ -19,6 +19,14 @@ add_executable(norman_rf_protocol_tests
 target_link_libraries(norman_rf_protocol_tests PRIVATE norman_rf_protocol)
 
 enable_testing()
+add_executable(norman_rf_learning_session_tests
+  tests/learning_session_tests.cpp
+  ../esphome/components/norman_rf_monitor/learned_panel.cpp
+  ../esphome/components/norman_rf_monitor/learned_relay_endpoint.cpp)
+target_include_directories(norman_rf_learning_session_tests PRIVATE
+  tests/fakes ../esphome/components/norman_rf_monitor)
+target_link_libraries(norman_rf_learning_session_tests PRIVATE norman_rf_protocol)
+add_test(NAME norman_rf_learning_session_tests COMMAND norman_rf_learning_session_tests)
 add_test(NAME norman_rf_protocol_tests COMMAND norman_rf_protocol_tests)
 
 add_executable(norman_rf_learned_panel_tests

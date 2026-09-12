@@ -136,7 +136,7 @@ void NormanRfMonitor::hop_channel_() {
   // A matched packet may start a relay, in which case that burst owns the radio.
   this->poll_radio_();
   if (this->tx_active_) return;
-  const size_t channel_count = this->relay_enabled() ? 2 : kCandidateChannels.size();
+  const size_t channel_count = this->relay_enabled() && !learning_.active(millis()) ? 2 : kCandidateChannels.size();
   this->channel_index_ = (this->channel_index_ + 1) % channel_count;
   this->write_register_(kRegisterRfChannel, kCandidateChannels[channel_index_]);
   this->ce_pin_->digital_write(true);
@@ -252,8 +252,8 @@ void NormanRfMonitor::update_register_snapshot_() {
   this->register_snapshot_ = snapshot;
 }
 
-bool NormanRfMonitor::can_transmit_() const {
-  return radio_ready_ && !tx_active_ &&
+bool NormanRfMonitor::can_transmit_() {
+  return radio_ready_ && !tx_active_ && !learning_.active(millis()) &&
          (!tx_has_finished_ || static_cast<uint32_t>(millis() - tx_last_finished_ms_) >= 250);
 }
 
@@ -261,7 +261,7 @@ bool NormanRfMonitor::can_transmit_() const {
 bool NormanRfMonitor::configure_target(int slot, const std::string &name, const std::string &room,
                                        const std::string &open, const std::string &close,
                                        int last_index, int open_position, int close_position) {
-  if (tx_active_ || slot < 0 || slot >= 32) return false;
+  if (tx_active_ || learning_.active(millis()) || slot < 0 || slot >= 32) return false;
   command_repeat_.clear();
   norman_rf::Frame o{}, c{};
   if (!norman_rf::parse_frame_hex(open, o) || !norman_rf::parse_frame_hex(close, c)) return false;
@@ -271,7 +271,7 @@ bool NormanRfMonitor::configure_target(int slot, const std::string &name, const 
 }
 
 bool NormanRfMonitor::configure_target_endpoint(int slot, int position, const std::string &frame) {
-  if (tx_active_ || slot < 0 || slot >= 32) return false;
+  if (tx_active_ || learning_.active(millis()) || slot < 0 || slot >= 32) return false;
   command_repeat_.clear();
   norman_rf::Frame parsed{};
   if (!norman_rf::parse_frame_hex(frame, parsed)) return false;
@@ -280,7 +280,7 @@ bool NormanRfMonitor::configure_target_endpoint(int slot, int position, const st
 }
 
 bool NormanRfMonitor::configure_relay_endpoint(int slot, const std::string &name, const std::string &frame) {
-  if (tx_active_ || slot < 0 || slot >= static_cast<int>(relay_endpoints_.size())) return false;
+  if (tx_active_ || learning_.active(millis()) || slot < 0 || slot >= static_cast<int>(relay_endpoints_.size())) return false;
   norman_rf::Frame parsed{};
   if (!norman_rf::parse_frame_hex(frame, parsed)) return false;
   for (const auto &panel : panels_) if (panel.accepts(parsed)) return false;
@@ -395,6 +395,7 @@ void NormanRfMonitor::select_receive_channel_() {
 void NormanRfMonitor::handle_valid_frame_(const std::array<uint8_t, kPayloadWidth> &payload, uint32_t now) {
   norman_rf::Frame frame{};
   std::copy_n(payload.begin(), frame.size(), frame.begin());
+  learning_.observe(frame, now);
   command_repeat_.observe(frame);
   const auto match = match_received_command(panels_, relay_endpoints_, frame);
   if (!match.authorized()) return;
@@ -561,7 +562,10 @@ void NormanRfMonitor::finish_test_(const char *status) {
   this->write_register_(kRegisterConfig, kConfigPowerUp | kConfigPrimaryRx);
   this->ce_pin_->digital_write(true);
   this->tx_active_ = false;
-  if (!tx_is_relay_) command_success_ = std::string(status) == "complete_not_acknowledged";
+  if (!tx_is_relay_) {
+    command_success_ = std::string(status) == "complete_not_acknowledged";
+    command_repeat_.completed(millis(), command_success_);
+  }
   if (std::string(status) != "complete_not_acknowledged") {
     relay_fault_ = true;
     command_repeat_.clear();

@@ -46,7 +46,15 @@ If they don't, an SDR may help determine why; buying one is not the first setup
 step. No captured packets could also mean poor reception, wiring, power, channel
 timing or a different controller source, rather than incompatible shutters.
 
-## What setup looks like today
+## Guided setup in Home Assistant
+
+Firmware0.10.0 and the matching Norman integration provide a [guided learning
+and profile-management flow](learning.md). It captures actions on the ESP,
+requires physical confirmation and creates named panel/room controls. It also
+supports relay-only actions and explicit removal. The flow does not decode
+unknown radio protocols or infer room membership without user input.
+
+## Advanced manual commissioning
 
 1. Keep a working original controller available. Place the ESP/radio near it,
    with the antenna fitted and reliable power. Leave relay disabled while
@@ -63,17 +71,16 @@ timing or a different controller source, rather than incompatible shutters.
 4. Establish the current rolling index using the protocol decoder, not a guessed
    number or a copied value from another home. The byte-25 permutation and
    validation code live in `protocol/`; the hub's two rolling bytes are not
-   simply interchangeable. There is no end-user capture-to-profile wizard yet.
+   simply interchangeable. The guided flow handles this for supported captures.
 5. Save the panel with `commission-target`, using a stable slot, physical name,
    room, templates and current index. Read `targets` back to check the identity
    and supported endpoints. See the [command reference](commissioning.md#explicit-per-installation-learning).
 6. Test that panel in both directions under observation and restore its starting
    state. Only then add more panels and use the integration's room controls.
 
-This still needs somebody comfortable with logs and command-line tools. It is
-not automatic discovery of every shutter in radio range. A useful next
-onboarding feature would be a guided “press Open, press Close, name this panel”
-flow; that is a future feature, not something hidden in the current release.
+This advanced route still needs somebody comfortable with logs and command-line
+tools. Most supported installations should start with the HA wizard instead.
+Neither route automatically authorizes every shutter in radio range.
 
 ## Repeating versus replacing the hub
 

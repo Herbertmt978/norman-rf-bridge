@@ -11,6 +11,8 @@
 #include "received_command.h"
 #include "target_batch.h"
 #include "command_repeat.h"
+#include "learning_session.h"
+#include "esphome/components/json/json_util.h"
 
 namespace esphome::norman_rf_monitor {
 
@@ -28,13 +30,14 @@ class NormanRfMonitor : public Component,
 
   bool radio_ready() const { return radio_ready_; }
   std::string hardware_status() const { return hardware_status_; }
-  std::string mode_status() const { return mode_status_; }
+  std::string mode_status() { return learning_.active(millis()) ? "learning_receive_only" : mode_status_; }
   std::string transmit_status() const { return tx_status_; }
   static constexpr size_t kTargetCapacity = 32;
   const LearnedRelayEndpoint *relay_endpoint(int slot) const {
     return slot >= 0 && slot < static_cast<int>(kRelayEndpointCapacity) ? &relay_endpoints_[slot] : nullptr;
   }
   bool configure_relay_endpoint(int slot, const std::string &name, const std::string &frame);
+  void learning_request(const std::string &request, JsonObject response);
   const LearnedPanel *target(int slot) const { return slot >= 0 && slot < 32 ? &panels_[slot] : nullptr; }
   bool configure_target(int slot, const std::string &name, const std::string &room,
                         const std::string &open, const std::string &close,
@@ -123,7 +126,7 @@ class NormanRfMonitor : public Component,
   void finish_test_(const char *status);
   bool start_burst_(const norman_rf::Frame &frame, int channel, int copies, bool relay);
   bool start_bursts_(const BatchFrames &frames, size_t count, int channel, int copies, bool relay);
-  bool can_transmit_() const;
+  bool can_transmit_();
   bool persist_relay_();
   void setup_relay_();
   void select_receive_channel_();
@@ -163,6 +166,7 @@ class NormanRfMonitor : public Component,
   bool relay_policy_ready_{false};
   norman_rf::RelayCache relay_cache_;
   CommandRepeat command_repeat_;
+  LearningSession learning_;
   bool automatic_repeats_{false};  // Restored by the ESPHome policy switch at boot.
   uint32_t automatic_repeat_count_{0};
   bool relay_fault_{false};

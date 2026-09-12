@@ -1,4 +1,5 @@
 #include "learned_panel.h"
+#include "profile_lifecycle.h"
 #include <cstdio>
 #include <algorithm>
 
@@ -22,7 +23,9 @@ std::string LearnedPanel::profile_id() const {
 void LearnedPanel::setup(uint8_t slot) {
   preference_ = global_preferences->make_preference<norman_rf::TargetProfile>(0x4e540100U + slot, true);
   marker_ = global_preferences->make_preference<uint32_t>(0x4e550100U + slot, true);
-  ready_ = preference_.load(&target_) && norman_rf::valid_target(target_);
+  const bool loaded = preference_.load(&target_);
+  if (loaded && deleted_profile(target_)) { ready_ = false; storage_fault_ = false; return; }
+  ready_ = loaded && norman_rf::valid_target(target_);
   if (ready_) return;
   uint32_t migrated{};
   if (marker_.load(&migrated)) { storage_fault_ = true; return; }
@@ -50,12 +53,14 @@ bool LearnedPanel::configure(const int32_t *open, size_t open_size, const int32_
 
 bool LearnedPanel::configure_target(const norman_rf::Frame &open, const norman_rf::Frame &close,
                                     int last_index, int open_position, int close_position,
-                                    const std::string &name, const std::string &room) {
+                                    const std::string &name, const std::string &room,
+                                    const norman_rf::Frame *opposite) {
   if (storage_fault_ || last_index < 0 || last_index > 255 || open_position <= 0 || open_position >= 100 ||
       (close_position != 0 && close_position != 100) || name.empty() || name.size() >= 48 ||
       room.empty() || room.size() >= 48) return false;
   auto candidate = target_;
   if (ready_) {
+    if (opposite != nullptr) return false;  // Wizard only creates new records.
     // Existing slot identities/counters/endpoints are not replaced by commissioning.
     if (open_position != this->open_position() || close_position != this->close_position() ||
         !norman_rf::learned_command(target_.commands, open) ||
@@ -69,6 +74,10 @@ bool LearnedPanel::configure_target(const norman_rf::Frame &open, const norman_r
     candidate.commands.last_index = static_cast<uint8_t>(last_index);
     candidate.commands.open_position = static_cast<uint8_t>(open_position);
     candidate.close_position = static_cast<uint8_t>(close_position);
+    if (opposite != nullptr) {
+      candidate.commands.close_up = *opposite;
+      candidate.commands.has_close_up = 1;
+    }
   }
   candidate.name.fill(0); candidate.room.fill(0);
   std::copy(name.begin(), name.end(), candidate.name.begin());
@@ -139,6 +148,25 @@ bool LearnedPanel::persist() {
   }
   ready_ = true;
   return true;
+}
+
+bool LearnedPanel::remove(const std::string &expected_id) {
+  if (deleted_profile(target_) && expected_id == target_.name.data()) return true;
+  if (!ready_ || profile_id() != expected_id) return false;
+  norman_rf::TargetProfile tombstone{}; tombstone.version = 255;
+  std::copy(expected_id.begin(), expected_id.end(), tombstone.name.begin());
+  ready_ = false;
+  if (!preference_.save(&tombstone) || !global_preferences->sync()) {
+    storage_fault_ = true; return false;
+  }
+  target_ = tombstone; storage_fault_ = false;
+  return true;
+}
+
+bool LearnedPanel::rename(const std::string &expected_id, const std::string &name, const std::string &room) {
+  if (!ready_ || profile_id() != expected_id) return false;
+  return configure_target(target_.commands.open, target_.commands.close, last_index(),
+                          open_position(), close_position(), name, room);
 }
 
 }  // namespace esphome::norman_rf_monitor

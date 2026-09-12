@@ -24,6 +24,9 @@ class LearnedRelayEndpoint {
     return ready_ && norman_rf::same_learned_command(profile_.command, frame);
   }
   bool ready() const { return ready_; }
+  std::string profile_id() const;
+  bool remove(const std::string &expected_id);
+  bool rename(const std::string &expected_id, const std::string &name);
   std::string name() const { return ready_ ? profile_.name.data() : ""; }
 
  private:

@@ -14,7 +14,8 @@ class LearnedPanel {
   void setup(uint8_t slot = 0);
   bool configure_target(const norman_rf::Frame &open, const norman_rf::Frame &close,
                         int last_index, int open_position, int close_position,
-                        const std::string &name, const std::string &room);
+                        const std::string &name, const std::string &room,
+                        const norman_rf::Frame *opposite = nullptr);
   bool configure(const int32_t *open, size_t open_size, const int32_t *close,
                  size_t close_size, int last_index, int open_position);
   bool configure_close_up(const int32_t *frame, size_t size);
@@ -35,6 +36,8 @@ class LearnedPanel {
   bool commit_transmit(const norman_rf::Frame &frame);
   bool observe(const norman_rf::Frame &frame);
   bool persist();
+  bool remove(const std::string &expected_id);
+  bool rename(const std::string &expected_id, const std::string &name, const std::string &room);
 
  private:
   ESPPreferenceObject preference_;
