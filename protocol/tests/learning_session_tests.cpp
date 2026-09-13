@@ -66,6 +66,17 @@ int main() {
   LearningSession boot;
   check(!boot.owns(token) && !boot.ready(0), "reboot drops uncommitted session");
 
+  LearningSession diagnostic;
+  diagnostic.begin(token, false, 0); diagnostic.capture(token, 0, 1);
+  check(!diagnostic.accept(token, 2) && diagnostic.error() == "need_two_presses",
+        "early acceptance caches a diagnostic error");
+  check(!diagnostic.capture_expired(60000) && diagnostic.capture_expired(60001),
+        "capture expiry boundary remains observable despite cached error");
+  check(diagnostic.error() == "need_two_presses",
+        "expiry projection does not mutate the learner's validation error");
+  diagnostic.cancel();
+  check(!diagnostic.capture_expired(60002), "cancel clears capture-expired projection");
+
   // Hub presses can jump outside the forward half range. Timing and distinct
   // samples, not the assumed ordering of their codes, establish this capture.
   LearningSession hub;

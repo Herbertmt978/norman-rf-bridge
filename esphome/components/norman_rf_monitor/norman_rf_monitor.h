@@ -85,8 +85,8 @@ class NormanRfMonitor : public Component,
   uint8_t learning_samples() { return learning_active() ? learning_.unique() : 0; }
   std::string learning_status() {
     if (!learning_active()) return "idle";
-    if (!learning_.error().empty()) return learning_.error();
     if (learning_.capture_expired(millis())) return "capture_expired";
+    if (!learning_.error().empty()) return learning_.error();
     if (!learning_.capturing()) return "awaiting_next_step";
     return "capturing_endpoint_" + std::to_string(learning_.endpoint());
   }

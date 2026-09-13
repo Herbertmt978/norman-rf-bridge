@@ -48,7 +48,7 @@ It starts enabled and remembers your choice. Reboots don't replay old commands.
 
 **Stay useful as an ESPHome device.** The image includes an active Bluetooth
 proxy, Wi-Fi signal and uptime diagnostics, radio counters, and OTA updates.
-Version **0.11.0-experimental** adds last-command and RF-activity ages, transmitter
+Version **0.11.1-experimental** adds last-command and RF-activity ages, transmitter
 faults, learning/profile counts, memory and loop timing, plus a three-second
 onboard LED Identify button. See [the diagnostic entity guide](docs/diagnostics.md).
 You can add supported sensors on spare pins once power and pin conflicts are

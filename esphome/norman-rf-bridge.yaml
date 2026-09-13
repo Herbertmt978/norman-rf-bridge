@@ -1,7 +1,7 @@
 substitutions:
   device_name: norman-rf-bridge
   friendly_name: Norman RF Bridge
-  project_version: 0.11.0-experimental
+  project_version: 0.11.1-experimental
 
 esphome:
   name: ${device_name}

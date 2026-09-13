@@ -1,6 +1,6 @@
 # Bridge diagnostics in Home Assistant
 
-Firmware 0.11.0-experimental adds read-only diagnostics to each ESPHome device.
+Firmware 0.11.1-experimental adds read-only diagnostics to each ESPHome device.
 The Norman integration's room and panel controls are unchanged. No new hardware
 is needed on the documented Freenove ESP32-WROOM board.
 
@@ -31,6 +31,9 @@ radio completed its burst, not that the motor acknowledged or moved.
 the current guided session without its token or raw frames. Samples mean the
 strongest candidate's distinct samples (0–2), not approval to save an ambiguous
 capture. The wizard remains the authority for accepting and saving profiles.
+Once the capture window expires, the diagnostic reports `capture_expired` even
+if an earlier acceptance attempt left a cached error such as `need_two_presses`.
+This status-priority correction is the only behavior change from 0.11.0.
 
 Saved panels/free panel slots and saved relay profiles/free relay slots are
 reported separately: there are 32 slots in each namespace. Only usable saved
@@ -63,6 +66,11 @@ profile counts. A temporary learning session showed active/capturing status,
 then returned to idle after cancellation without saving a profile. Identify was
 accepted through HA and the radio transmit count stayed unchanged; the LED
 itself was not observed through the enclosure.
+
+The 0.11.1 expiry correction was also checked on a real bridge: an empty capture
+produced `need_two_presses`, the diagnostic changed to `capture_expired` after
+the 60-second window, and cancellation returned it to `idle`. No profile was
+saved. Native regression tests cover the expiry boundary with a cached error.
 
 Seven native CTest suites, seven Python tool tests and the pinned ESPHome
 2026.4.1 build passed. No shutters were moved for this diagnostics update and no
