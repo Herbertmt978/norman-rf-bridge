@@ -1,7 +1,7 @@
 substitutions:
   device_name: norman-rf-bridge
   friendly_name: Norman RF Bridge
-  project_version: 0.10.2-experimental
+  project_version: 0.11.1-experimental
 
 esphome:
   name: ${device_name}
@@ -280,6 +280,16 @@ api:
         - script.execute: rf_wifi_pause_test
 
 script:
+  - id: identify_board
+    mode: single
+    then:
+      - repeat:
+          count: 6
+          then:
+            - output.turn_on: identify_led
+            - delay: 250ms
+            - output.turn_off: identify_led
+            - delay: 250ms
   - id: rf_wifi_pause_test
     mode: single
     then:
@@ -344,7 +354,21 @@ norman_rf_monitor:
 debug:
   update_interval: 60s
 
+output:
+  - platform: gpio
+    id: identify_led
+    pin: GPIO2
+
 binary_sensor:
+  - platform: template
+    name: RF transmitter fault
+    device_class: problem
+    entity_category: diagnostic
+    lambda: return id(rf_monitor).transmitter_fault();
+  - platform: template
+    name: RF learning active
+    entity_category: diagnostic
+    lambda: return id(rf_monitor).learning_active();
   - platform: template
     name: RF panel ready
     entity_category: diagnostic
@@ -360,6 +384,21 @@ binary_sensor:
     lambda: return id(rf_monitor).radio_ready();
 
 text_sensor:
+  - platform: template
+    name: RF last direct command
+    entity_category: diagnostic
+    update_interval: 5s
+    lambda: return id(rf_monitor).last_command_description();
+  - platform: template
+    name: RF last transmitter fault
+    entity_category: diagnostic
+    update_interval: 5s
+    lambda: return id(rf_monitor).last_transmitter_fault();
+  - platform: template
+    name: RF learning status
+    entity_category: diagnostic
+    update_interval: 5s
+    lambda: return id(rf_monitor).learning_status();
   - platform: template
     name: RF panel
     entity_category: diagnostic
@@ -411,6 +450,73 @@ text_sensor:
     lambda: return {id(rf_monitor).register_snapshot()};
 
 sensor:
+  - platform: debug
+    free:
+      name: Free memory
+    min_free:
+      name: Minimum free memory
+    loop_time:
+      name: Loop time
+  - platform: template
+    name: RF last received age
+    entity_category: diagnostic
+    device_class: duration
+    unit_of_measurement: s
+    accuracy_decimals: 0
+    update_interval: 5s
+    lambda: return id(rf_monitor).last_receive_age();
+  - platform: template
+    name: RF last relay age
+    entity_category: diagnostic
+    device_class: duration
+    unit_of_measurement: s
+    accuracy_decimals: 0
+    update_interval: 5s
+    lambda: return id(rf_monitor).last_relay_age();
+  - platform: template
+    name: RF last direct command age
+    entity_category: diagnostic
+    device_class: duration
+    unit_of_measurement: s
+    accuracy_decimals: 0
+    update_interval: 5s
+    lambda: return id(rf_monitor).last_command_age();
+  - platform: template
+    name: RF pending repeats
+    entity_category: diagnostic
+    accuracy_decimals: 0
+    update_interval: 2s
+    lambda: return id(rf_monitor).repeats_remaining();
+  - platform: template
+    name: RF learning samples
+    entity_category: diagnostic
+    accuracy_decimals: 0
+    update_interval: 2s
+    lambda: return id(rf_monitor).learning_samples();
+  - platform: template
+    name: RF saved panels
+    entity_category: diagnostic
+    accuracy_decimals: 0
+    update_interval: 10s
+    lambda: return id(rf_monitor).saved_panel_count();
+  - platform: template
+    name: RF free panel slots
+    entity_category: diagnostic
+    accuracy_decimals: 0
+    update_interval: 10s
+    lambda: return 32 - id(rf_monitor).saved_panel_count();
+  - platform: template
+    name: RF saved relay profiles
+    entity_category: diagnostic
+    accuracy_decimals: 0
+    update_interval: 10s
+    lambda: return id(rf_monitor).saved_relay_count();
+  - platform: template
+    name: RF free relay slots
+    entity_category: diagnostic
+    accuracy_decimals: 0
+    update_interval: 10s
+    lambda: return 32 - id(rf_monitor).saved_relay_count();
   - platform: template
     name: RF relayed commands
     entity_category: diagnostic
@@ -476,6 +582,12 @@ sensor:
     lambda: return id(rf_monitor).dropped_count();
 
 button:
+  - platform: template
+    name: Identify board
+    entity_category: diagnostic
+    icon: mdi:led-on
+    on_press:
+      - script.execute: identify_board
   - platform: template
     name: RF open
     on_press:
