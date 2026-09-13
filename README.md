@@ -18,7 +18,7 @@ adds individual section and whole-room Open/Close controls. HA sends a Wi-Fi
 command to the local ESP; the nRF24-compatible module sends the shutter command.
 That path doesn't call the Norman hub or need its password. The integration's
 RF transport is currently a pre-release feature; follow its
-[RF setup guide](https://github.com/Herbertmt978/Norman-HA-Integration/blob/Herb/esphome-rf-transport/docs/esphome-rf.md).
+[RF setup guide](https://github.com/Herbertmt978/Norman-HA-Integration/blob/main/docs/esphome-rf.md).
 
 **Work as a USB-powered repeater.** After learning the installation's commands
 and enabling relay mode, the board listens for matching traffic and forwards
@@ -26,11 +26,18 @@ it automatically. It can forward commands from the Norman hardware or another
 ESP bridge. This runs locally, including when Wi-Fi or HA is unavailable.
 It isn't an unrestricted repeater for every packet it hears.
 
-**Learn and manage profiles in HA.** Firmware **0.10.0-experimental** adds a
+**Learn and manage profiles in HA.** Firmware **0.10.2-experimental** uses a
 guided flow in the companion integration. Name a section and room, press the
 requested controller actions, and confirm what moved. HA can also learn
 forwarding-only actions, rename/regroup profiles, and remove a selected profile
 with confirmation. Follow the [setup and profile manual](docs/learning.md).
+The learner checks repeated matching samples without assuming the hub's codes
+advance in order. It tolerates one-off background messages but refuses to guess
+between two plausible targets. A fresh board has learned five sections through
+the HA wizard using hub commands, without importing profiles or using an SDR.
+All five passed watched individual and whole-bedroom Open/Close-upwards tests
+after the ESP was placed in the bedroom. Long-term delivery and use in another
+household still need qualification.
 
 **Repeat its own commands.** Firmware **0.10.0-experimental** sends up to two
 extra full bursts after a direct command, waiting two seconds after each
@@ -72,7 +79,7 @@ commands. Removing the hub also means losing its app-based control and schedules
 
 ## Hardware
 
-The two prototypes use the same simple assembly:
+The prototypes use the same simple assembly:
 
 | Part | Used here |
 | --- | --- |
@@ -143,13 +150,21 @@ not normal RF upgrades.
 
 ## What has been tested, and what hasn't
 
-Both boards have moved their local shutters through HA: five office sections
-and four lounge panels, individually and as room groups. Learned repeating has
+The original two boards have moved their local shutters through HA: five office
+sections and four lounge panels, individually and as room groups. Learned repeating has
 also been observed, including a Wi-Fi-disconnected test. The original Norman
 hardware stayed powered during the recent room trials, so those results don't
 prove that every RF path used only ESP devices.
 
-The latest automatic-repeat test closed all four lounge panels, but still left
+A third, freshly commissioned board learned five bedroom sections through HA.
+With upward closing selected, each section passed an individual Close/Open
+test, and all five passed two whole-bedroom Close/Open cycles on 13 September
+2026. These commands used HA's ESP controls without calling the hub. The existing
+hub and repeaters remained powered, so they may still have helped carry RF.
+The [learning manual](docs/learning.md#fresh-board-testing-and-remaining-limits)
+records the capture fixes, closing-direction correction and test limitations.
+
+An earlier automatic-repeat test closed all four lounge panels, but still left
 one of five office sections open. A subsequent Open restored both rooms. An
 earlier local transmitter fault also remains unexplained. Extra bursts can
 recover some misses; they cannot guarantee reception or fix every fault.
