@@ -393,6 +393,7 @@ void NormanRfMonitor::select_receive_channel_() {
 }
 
 void NormanRfMonitor::handle_valid_frame_(const std::array<uint8_t, kPayloadWidth> &payload, uint32_t now) {
+  last_receive_.mark(millis_64());
   norman_rf::Frame frame{};
   std::copy_n(payload.begin(), frame.size(), frame.begin());
   learning_.observe(frame, now);
@@ -443,6 +444,13 @@ bool NormanRfMonitor::transmit_targets(const std::vector<int32_t> &slots,
   if (!prepare_target_batch(panels_, slots, positions, identities, frames)) return false;
   if (!start_bursts_(frames, slots.size(), 15, 100, false)) return false;
   command_repeat_.remember(slots, positions, identities, frames, panels_, millis());
+  last_command_.mark(millis_64());
+  const auto &first = panels_[slots[0]];
+  const bool same_position = std::all_of(positions.begin(), positions.end(), [&](int p) { return p == positions[0]; });
+  const std::string action = !same_position ? "Mixed endpoints" : positions[0] == 0 ? "Close down" :
+                             positions[0] == 100 ? "Close up" : "Open";
+  last_command_description_ = action + ": " + first.room() + " / " + first.name();
+  if (slots.size() > 1) last_command_description_ += " (+" + std::to_string(slots.size() - 1) + " targets)";
   return true;
 }
 
@@ -554,6 +562,9 @@ void NormanRfMonitor::send_test_copy_() {
 }
 
 void NormanRfMonitor::finish_test_(const char *status) {
+  transmitter_fault_ = std::string(status) != "complete_not_acknowledged";
+  if (transmitter_fault_) last_transmitter_fault_ = status;
+  if (tx_is_relay_ && !transmitter_fault_) last_relay_.mark(millis_64());
   this->cancel_interval("bounded_tx");
   this->ce_pin_->digital_write(false);
   this->issue_command_(0xe1);

@@ -109,6 +109,7 @@ class LearningSession {
   void saved(int slot) { active_ = false; capturing_ = false; saved_slot_ = slot; error_.clear(); }
   bool relay() const { return relay_; }
   bool capturing() const { return capturing_; }
+  bool capture_expired(uint32_t now) const { return capturing_ && uint32_t(now - capture_started_) >= 60000; }
   int endpoint() const { return endpoint_; }
   uint8_t unique() const {
     uint8_t samples = 0;

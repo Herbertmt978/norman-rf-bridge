@@ -12,6 +12,7 @@
 #include "target_batch.h"
 #include "command_repeat.h"
 #include "learning_session.h"
+#include "diagnostics.h"
 #include "esphome/components/json/json_util.h"
 
 namespace esphome::norman_rf_monitor {
@@ -74,6 +75,27 @@ class NormanRfMonitor : public Component,
   uint32_t invalid_count() const { return invalid_count_; }
   uint32_t duplicate_count() const { return duplicate_count_; }
   uint32_t dropped_count() const { return dropped_count_; }
+  float last_receive_age() const { return last_receive_.seconds(millis_64()); }
+  float last_relay_age() const { return last_relay_.seconds(millis_64()); }
+  float last_command_age() const { return last_command_.seconds(millis_64()); }
+  std::string last_command_description() const { return last_command_description_; }
+  bool transmitter_fault() const { return transmitter_fault_; }
+  std::string last_transmitter_fault() const { return last_transmitter_fault_; }
+  bool learning_active() { return learning_.active(millis()); }
+  uint8_t learning_samples() { return learning_active() ? learning_.unique() : 0; }
+  std::string learning_status() {
+    if (!learning_active()) return "idle";
+    if (!learning_.error().empty()) return learning_.error();
+    if (learning_.capture_expired(millis())) return "capture_expired";
+    if (!learning_.capturing()) return "awaiting_next_step";
+    return "capturing_endpoint_" + std::to_string(learning_.endpoint());
+  }
+  size_t saved_panel_count() const {
+    size_t count = 0; for (const auto &p : panels_) if (p.ready()) ++count; return count;
+  }
+  size_t saved_relay_count() const {
+    size_t count = 0; for (const auto &p : relay_endpoints_) if (p.ready()) ++count; return count;
+  }
 
  protected:
   static constexpr uint8_t kRegisterConfig = 0x00;
@@ -173,6 +195,10 @@ class NormanRfMonitor : public Component,
   bool tx_is_relay_{false};
   bool command_success_{false};
   uint32_t relayed_count_{0};
+  ActivityAge last_receive_, last_relay_, last_command_;
+  std::string last_command_description_{"none_since_boot"};
+  bool transmitter_fault_{false};
+  std::string last_transmitter_fault_{"none_since_boot"};
 };
 
 }  // namespace esphome::norman_rf_monitor
