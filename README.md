@@ -1,14 +1,28 @@
+<div align="center">
+
+<img src="brand/header.svg" alt="Norman RF Bridge: ESP radio and signal waves" width="620">
+
 # Norman RF Bridge
 
-Control Norman Gen1 shutters from Home Assistant using an ESP32 and a small
-2.4 GHz radio. Plug it into USB power and leave it near the shutters. Once
-set up, it can send commands directly and repeat learned Norman traffic.
+Build an ESPHome bridge for direct Norman Gen 1 shutter control and local RF repeating.
 
-The aim is to replace the Norman hub's control role and its USB repeaters with
-hardware you can build, update and use with ESPHome. Direct control and radio
-forwarding both work on the prototypes. This is still an experimental project,
-not a universal plug-in replacement: setup needs watched learning and some commands
-still miss panels. Keep the original controls available while testing.
+![Experimental](https://img.shields.io/badge/Status-Experimental-8B5CF6)
+[![GPL-3.0](https://img.shields.io/badge/Licence-GPL--3.0-0F766E)](LICENSE)
+
+[Capabilities](#what-it-does) · [Hardware](#hardware) · [Compatibility](#will-it-work-with-my-shutters) · [Getting started](#getting-started) · [Evidence and limits](#what-has-been-tested-and-what-hasnt) · [Guides](#more-detail)
+
+</div>
+
+---
+
+The bridge uses an ESP32 and nRF24-compatible 2.4 GHz radio. Once it has learned
+your installation's commands, it can send shutter commands from Home Assistant
+or repeat matching Norman traffic without relying on Wi-Fi for the repeat path.
+
+This is an experimental build. Direct control and repeating work on the tested
+prototypes, but commissioning needs watched learning and some commands still
+miss panels. Keep the original controls available while testing. It is an
+independent project, not an official Norman product.
 
 ## What it does
 
@@ -198,5 +212,5 @@ work to do before selling it as a finished replacement.
 This project builds on the Norman research and Arduino examples shared in the
 [Home Assistant community thread](https://community.home-assistant.io/t/norman-tdbu-blind-control/705405),
 including the `NRF24_Sniff` work and Yveaux's NRF24 Sniffer. It is licensed
-under [GPL-3.0-or-later](LICENSE). This is an independent project, not an
+under [GPL-3.0](LICENSE). This is an independent project, not an
 official Norman product.
