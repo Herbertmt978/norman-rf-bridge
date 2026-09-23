@@ -12,6 +12,5 @@
   <rect x="66" y="104" width="62" height="45" rx="8" fill="none" stroke="#67dded" stroke-width="6"/>
   <path d="M97 104V82M84 80q13-13 26 0M73 69q24-25 48 0" fill="none" stroke="#a78bfa" stroke-width="6" stroke-linecap="round"/>
   <circle cx="117" cy="137" r="4" fill="#67dded"/>
-  <text x="220" y="113" fill="#f5f8ff" font-family="Arial, Helvetica, sans-serif" font-size="58" font-weight="700" letter-spacing="2">NORMAN</text>
-  <text x="222" y="153" fill="#a9c4e4" font-family="Arial, Helvetica, sans-serif" font-size="23" letter-spacing="4">RF BRIDGE  /  ESPHOME</text>
+  <text x="220" y="130" fill="#f5f8ff" font-family="Arial, Helvetica, sans-serif" font-size="51" font-weight="700" letter-spacing="1">NORMAN RF BRIDGE</text>
 </svg>
