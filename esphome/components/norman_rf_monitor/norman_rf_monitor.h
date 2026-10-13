@@ -71,6 +71,10 @@ class NormanRfMonitor : public Component,
   bool transmit_command(int position);
   bool set_relay(bool enabled);
   void set_automatic_repeats(bool enabled);
+  // Capped at level 2: the PA/LNA module gain is unmeasured and UK 2.4 GHz
+  // equipment is limited to 100 mW EIRP.
+  void set_tx_power_level(uint8_t level) { tx_power_level_ = level > 2 ? 2 : level; }
+  uint8_t tx_power_level() const { return tx_power_level_; }
   bool automatic_repeats() const { return automatic_repeats_; }
   uint8_t repeats_remaining() const;
   uint32_t automatic_repeat_count() const { return automatic_repeat_count_; }
@@ -210,6 +214,7 @@ class NormanRfMonitor : public Component,
   uint16_t tx_remaining_{0};
   uint32_t tx_deadline_ms_{6500};
   bool tx_is_repeat_{false};
+  uint8_t tx_power_level_{0};
   uint32_t command_sequence_{0};
   uint32_t completed_sequence_{0};
   std::string command_result_{"none_since_boot"};

@@ -554,7 +554,9 @@ bool NormanRfMonitor::start_bursts_(const BatchFrames &frames, size_t count, int
   this->issue_command_(0xe1);  // FLUSH_TX: every trial starts with an empty FIFO.
   this->write_register_(kRegisterStatus, kStatusClearAllInterrupts);
   this->write_register_(kRegisterRfChannel, static_cast<uint8_t>(channel));
-  this->write_register_(kRegisterRfSetup, 0x00);  // Lowest nRF power setting, 1 Mbps.
+  // 1 Mbps; power level is RF_SETUP bits 2:0. SI24R1 before the module PA:
+  // 0 = -12 dBm, 1 = -6 dBm, 2 = -4 dBm. (Genuine nRF24L01+: 0/1 = -18, 2 = -12.)
+  this->write_register_(kRegisterRfSetup, tx_power_level_);
   this->enable();
   this->transfer_byte(kCommandWriteRegister | 0x10);  // TX_ADDR, LSB first.
   for (const uint8_t byte : {0x05, 0x1c, 0x9c, 0x5c, 0xdc}) this->transfer_byte(byte);

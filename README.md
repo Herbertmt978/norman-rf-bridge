@@ -66,7 +66,9 @@ Version **0.11.1-experimental** adds last-command and RF-activity ages, transmit
 faults, learning/profile counts, memory and loop timing, plus a three-second
 onboard LED Identify button. Version **0.11.4-experimental** adds an optional
 Bluetooth scan pause during RF, a fault-time radio register snapshot and a
-fresh status read that prevents a false transmitter abort. See [the diagnostic
+fresh status read that prevents a false transmitter abort. Version
+**0.12.2-experimental** adds a capped **RF transmit power** setting and protocol 4
+status that lets HA confirm a command whose reply was lost. See [the diagnostic
 entity guide](docs/diagnostics.md).
 You can add supported sensors on spare pins once power and pin conflicts are
 checked. The external radio is for Norman RF; it isn't a Wi-Fi adapter or a

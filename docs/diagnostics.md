@@ -216,3 +216,20 @@ not established. HA v0.5.1b2 therefore sends room sections separately and uses
 the protocol 4 sequence fields only to confirm commands whose action reply was
 lost; `rf_room_command` remains available but unused. The native API sometimes
 drops action replies while the radio command still runs.
+
+## Selectable transmit power (0.12.2-experimental)
+
+**RF transmit power** (config select, restored across reboots, default Minimum)
+sets RF_SETUP bits 2:0 for every burst, at 1 Mbps. On the fitted SI24R1:
+Minimum = -12 dBm, Raised = -6 dBm, High = -4 dBm before the module's PA/LNA
+(on a genuine nRF24L01+: -18, -18 and -12 dBm). The firmware caps the setting at
+High. The module's amplifier gain and antenna are unmeasured; UK 2.4 GHz
+equipment is limited to 100 mW EIRP, so verify the radiated level (for example
+with the Pluto) before treating High as a permanent setting. `rf_targets_status`
+reports `tx_power_level` (0-2).
+
+On 13 October 2026 all three bridges were updated to 0.12.2 with every target
+and counter preserved, and set to High. After a power cycle that cleared a
+degraded Wi-Fi state on the downstairs bridge, two camera-checked lounge room
+actions at High moved all eight panels. The power cycle and power change happened
+together, so the improvement is not attributed to power alone.

@@ -1,7 +1,7 @@
 substitutions:
   device_name: norman-rf-bridge
   friendly_name: Norman RF Bridge
-  project_version: 0.12.0-experimental
+  project_version: 0.12.2-experimental
 
 esphome:
   name: ${device_name}
@@ -132,6 +132,7 @@ api:
               root["ble_scan_pause_count"] = id(rf_monitor).ble_scan_pause_count();
               root["protocol_version"] = 4;
               root["sequential_rooms"] = true;
+              root["tx_power_level"] = id(rf_monitor).tx_power_level();
               root["command_active"] = id(rf_monitor).original_command_active();
               root["command_sequence"] = id(rf_monitor).command_sequence();
               root["completed_sequence"] = id(rf_monitor).completed_sequence();
@@ -643,6 +644,20 @@ button:
     id: bridge_restart
     name: Restart
     entity_category: diagnostic
+
+select:
+  - platform: template
+    name: RF transmit power
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    initial_option: Minimum
+    options:
+      - Minimum
+      - Raised
+      - High
+    on_value:
+      - lambda: id(rf_monitor).set_tx_power_level(i);
 
 switch:
   - platform: template
