@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="brand/header.svg" alt="Norman RF Bridge: ESP radio and signal waves" width="620">
+<img src="brand/header.svg" alt="Norman RF Bridge: an ESP32 and nRF24 radio board sending signal waves to a shutter" width="880">
 
 # Norman RF Bridge
 
