@@ -11,32 +11,40 @@ void crc(norman_rf::Frame &f) {
   f[28] = static_cast<uint8_t>(c >> 8); f[29] = static_cast<uint8_t>(c);
 }
 int main() {
-  for (size_t rounds : {size_t{100}, size_t{20}}) {
+  for (size_t copies : {size_t{100}, size_t{20}}) {
     for (size_t count=1;count<=8;++count) {
-      std::array<int,8> copies{}, transitions{};
-      size_t previous=0;
-      for (size_t round=0;round<rounds;++round) {
-        // send_test_copy_ sends count copies per round, all of the round's target.
-        const auto index=batch_block_target(round,rounds,count);
-        check(index<count, "block target within batch");
-        check(index>=previous, "targets never interleave or return");
-        if (round>0 && index!=previous) ++transitions[index];
-        previous=index;
-        copies[index]+=static_cast<int>(count);
+      const size_t total=sequential_total_ticks(copies,count);
+      check(total==copies*count+kTargetGapTicks*(count-1), "schedule length is bursts plus gaps");
+      std::array<size_t,8> sent{}, first{}, last{};
+      size_t previous=0, gap_run=0, sends=0;
+      bool seen_any=false;
+      for (size_t tick=0;tick<total;++tick) {
+        size_t target=99;
+        if (!sequential_target(tick,copies,target)) {
+          ++gap_run;
+          continue;
+        }
+        check(target<count, "scheduled target within batch");
+        check(target>=previous, "targets never interleave or return");
+        if (seen_any && target!=previous)
+          check(gap_run==kTargetGapTicks, "full idle gap separates consecutive targets");
+        check(!seen_any || target!=previous || gap_run==0, "a target's own burst has no gaps");
+        if (sent[target]==0) first[target]=tick;
+        last[target]=tick;
+        ++sent[target]; ++sends;
+        previous=target; gap_run=0; seen_any=true;
       }
-      check(batch_block_target(0,rounds,count)==0, "first block is first selected target");
-      int total=0; for (size_t i=0;i<count;++i) total+=copies[i];
-      check(total==static_cast<int>(rounds*count), "total airtime unchanged");
-      if (rounds==100 && 100%count==0)
-        for (size_t i=0;i<count;++i) check(copies[i]==100, "even blocks keep100copies per target");
+      check(sends==copies*count, "one copy per non-gap tick");
       for (size_t i=0;i<count;++i) {
-        check(copies[i]>=static_cast<int>((rounds/count)*count) &&
-              copies[i]<=static_cast<int>((rounds/count+1)*count), "blocks balanced to one round");
-        check(i==0 || transitions[i]==1, "each later target starts exactly once");
+        check(sent[i]==copies, "every target receives its complete burst");
+        check(last[i]-first[i]+1==copies, "each burst is contiguous");
       }
+      check(sequential_target(total-1,copies,previous) && previous==count-1, "schedule ends on the last target");
     }
   }
-  check(batch_block_target(99,100,1)==0, "single target keeps original one-copy cadence");
+  check(sequential_total_ticks(100,1)==100, "single target keeps the original 100-tick burst");
+  check(sequential_total_ticks(100,4)*55==27940, "four-section room lasts about 27.9 s");
+  check(sequential_total_ticks(100,8)<=65535, "largest room fits the 16-bit tick counter");
   std::array<LearnedPanel, 32> panels{};
   std::vector<int32_t> slots, positions;
   std::vector<std::string> ids;

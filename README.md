@@ -66,7 +66,9 @@ Version **0.11.1-experimental** adds last-command and RF-activity ages, transmit
 faults, learning/profile counts, memory and loop timing, plus a three-second
 onboard LED Identify button. Version **0.11.4-experimental** adds an optional
 Bluetooth scan pause during RF, a fault-time radio register snapshot and a
-fresh status read that prevents a false transmitter abort. See [the diagnostic
+fresh status read that prevents a false transmitter abort. Version
+**0.12.2-experimental** adds a capped **RF transmit power** setting and protocol 4
+status that lets HA confirm a command whose reply was lost. See [the diagnostic
 entity guide](docs/diagnostics.md).
 You can add supported sensors on spare pins once power and pin conflicts are
 checked. The external radio is for Norman RF; it isn't a Wi-Fi adapter or a
@@ -191,10 +193,11 @@ recover some misses; they cannot guarantee reception or fix every fault.
 
 HA shows the requested state after the first successful burst. There is no
 motor acknowledgement or measured position, so a green HA action is not proof
-that a panel moved. Room controls send each section as its own command, one
-after another (about 6 s each), not a native whole-room broadcast. Sections
-addressed together in one burst intermittently failed to move; sequential
-commands moved every lounge panel in camera-checked trials.
+that a panel moved. Room controls send each section's full burst one after
+another (about 6 s each), not a native whole-room broadcast. Sections sent
+together, or as one bridge-run sequence, intermittently failed to move. From
+firmware **0.12.0-experimental**, HA can confirm a section from the bridge's
+status when its reply is lost, and still sends the remaining sections.
 There are 32 profile slots per bridge and up to eight sections in one room.
 Stop, arbitrary percentage positioning and battery feedback aren't implemented.
 

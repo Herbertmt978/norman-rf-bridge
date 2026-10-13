@@ -26,11 +26,15 @@ Direct commands select an explicitly learned open, close-down or optional
 close-up template. The ESP reserves the next counter in nonvolatile storage,
 updates the two rolling bytes and CRC, then sends 100 copies on channel15 at
 55ms spacing. A multi-target batch reserves all selected counters before any
-RF, then gives each of up to8 targets one contiguous block of55ms rounds
-(0.11.4; earlier versions interleaved them). The HA room covers no longer use
-multi-target batches: they send each section as its own command, because
-interleaved and contiguous batches both missed panels in camera trials while
-sequential commands did not. An individual command uses the batch path with one target. A storage failure consumes any earlier reservations
+RF, then sends each of up to8 targets' full100-copy burst in turn with a
+0.6s gap (0.12.0). Interleaved (0.7-0.11.3) and contiguous four-per-tick (0.11.4)
+batches missed panels in camera trials; separate full bursts did far better.
+Protocol4 adds `rf_room_command`, which replies on acceptance with a sequence
+and expected duration, plus status sequence fields. Camera trials found the
+bridge-paced room missed a panel that separate commands moved, so HA sends
+sections separately and uses the sequence fields only to confirm a command
+whose reply was lost. A newer direct command preempts a running repeat. An individual command
+uses the batch path with one target. A storage failure consumes any earlier reservations
 without transmission or rewind. Batch failure makes all selected states uncertain.
 This copy count follows the locally successful burst test; the
 earlier proposed 1–3-copy limit was not established by measurement.

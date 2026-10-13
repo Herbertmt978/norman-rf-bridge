@@ -1,7 +1,7 @@
 substitutions:
   device_name: norman-rf-bridge
   friendly_name: Norman RF Bridge
-  project_version: 0.11.4-experimental
+  project_version: 0.12.2-experimental
 
 esphome:
   name: ${device_name}
@@ -130,7 +130,13 @@ api:
               root["ble_scan_pause_enabled"] = id(rf_monitor).ble_scan_pause_enabled();
               root["ble_scan_pause_state"] = id(rf_monitor).ble_scan_pause_status();
               root["ble_scan_pause_count"] = id(rf_monitor).ble_scan_pause_count();
-              root["protocol_version"] = 3;
+              root["protocol_version"] = 4;
+              root["sequential_rooms"] = true;
+              root["tx_power_level"] = id(rf_monitor).tx_power_level();
+              root["command_active"] = id(rf_monitor).original_command_active();
+              root["command_sequence"] = id(rf_monitor).command_sequence();
+              root["completed_sequence"] = id(rf_monitor).completed_sequence();
+              root["command_result"] = id(rf_monitor).command_result();
               root["batch_capacity"] = 8;
               root["automatic_repeats"] = id(rf_monitor).automatic_repeats();
               root["repeats_remaining"] = id(rf_monitor).repeats_remaining();
@@ -173,6 +179,27 @@ api:
               - api.respond:
                   success: false
                   error_message: "Batch rejected: maximum8 unique learned targets, matching identities/endpoints, idle radio and durable storage required"
+
+    # Protocol 4 rooms: replies on acceptance because a sequential room outlasts
+    # the action deadline. HA polls rf_targets_status until completed_sequence
+    # matches the returned sequence. Never retried automatically.
+    - action: rf_room_command
+      supports_response: only
+      variables:
+        targets_json: string
+      then:
+        - if:
+            condition:
+              lambda: return id(rf_monitor).transmit_targets_json(targets_json);
+            then:
+              - api.respond:
+                  data: !lambda |-
+                    root["sequence"] = id(rf_monitor).command_sequence();
+                    root["expected_ms"] = id(rf_monitor).command_expected_ms();
+            else:
+              - api.respond:
+                  success: false
+                  error_message: "Room rejected: maximum8 unique learned targets, matching identities/endpoints, idle radio and durable storage required"
 
     # Manual diagnostic only: repeat the same completed command, never new codes.
     - action: rf_targets_repeat
@@ -617,6 +644,20 @@ button:
     id: bridge_restart
     name: Restart
     entity_category: diagnostic
+
+select:
+  - platform: template
+    name: RF transmit power
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    initial_option: Minimum
+    options:
+      - Minimum
+      - Raised
+      - High
+    on_value:
+      - lambda: id(rf_monitor).set_tx_power_level(i);
 
 switch:
   - platform: template

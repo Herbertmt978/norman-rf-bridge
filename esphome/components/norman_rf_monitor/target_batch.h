@@ -7,22 +7,28 @@
 
 namespace esphome::norman_rf_monitor {
 
-// Bound a round to eight 2ms radio-completion waits, below its55ms cadence.
 inline constexpr size_t kBatchCapacity = 8;
 using BatchFrames = std::array<norman_rf::Frame, kBatchCapacity>;
 
-// rounds and count are validated nonzero before the scheduler starts. Each
-// target owns one contiguous block of rounds; every copy in a round belongs to
-// that target. Interleaving targets within a round (0.7-0.11.3) physically
-// missed panels although every target's frames were on air. All Norman frames
-// share one radio address; a duty-cycled motor plausibly samples another
-// target's frame and sleeps. Sequential and hub sends never interleave.
-// Contiguous blocks alone still missed a lounge panel on 2 of 2 camera-checked
-// actions (13 Oct 2026); separate single-target commands moved 24 of 24, so
-// the HA room covers now send sections one at a time.
-// Total rounds and copies per round are unchanged; uneven splits differ by one round.
-inline size_t batch_block_target(size_t round, size_t rounds, size_t count) {
-  return round * count / rounds;
+// Sequential room schedule. Each target receives its complete burst, one copy
+// per 55 ms tick, followed by an idle gap before the next target; one target is
+// the original single-command cadence. Interleaved (0.7-0.11.3) and contiguous
+// four-per-tick (0.11.4) batches missed panels in camera trials although every
+// target's frames were on air. Separate full single-target bursts about 1 s
+// apart moved 24 of 24 lounge panels. With a 0.6 s gap the second panel missed
+// its first pass 4 of 4 times (13 Oct 2026), so the gap is 2 s.
+inline constexpr size_t kTargetGapTicks = 36;  // About 2 s at 55 ms per tick.
+
+// copies and count are validated nonzero before the scheduler starts.
+inline size_t sequential_total_ticks(size_t copies, size_t count) {
+  return copies * count + kTargetGapTicks * (count - 1);
+}
+
+// Selects the target for this tick; false means an idle gap tick.
+inline bool sequential_target(size_t tick, size_t copies, size_t &target) {
+  const size_t span = copies + kTargetGapTicks;
+  target = tick / span;
+  return tick % span < copies;
 }
 
 inline bool prepare_target_batch(std::array<LearnedPanel, 32> &panels,

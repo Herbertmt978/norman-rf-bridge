@@ -189,3 +189,47 @@ separate single-target commands moved 24 of 24 times over three close/open pairs
 The Norman HA integration now sends room sections one at a time; multi-target
 batches remain available to other callers. Eight native suites, the completion
 probe harness and the pinned ESPHome 2026.4.1 build passed.
+
+## Bridge-paced rooms (0.12.0-experimental, protocol 4)
+
+Multi-target commands now send each target's complete burst (100 copies at 55 ms)
+in turn, with a 36-tick (about 2 s) idle gap between targets. A four-section
+room takes about 27.9 s. The transmit guard scales with the schedule; single
+commands keep the original 6.5 s guard. `rf_targets_status` adds
+`sequential_rooms`, `command_active` (original burst only), `command_sequence`,
+`completed_sequence` and `command_result`. The new `rf_room_command` action
+replies on acceptance with `sequence` and `expected_ms`.
+
+Automatic repeats of a room re-run the whole sequence within the existing
+60-second budget. Automatic and manual repeats are now preemptible: a newer
+direct command stops the repeat and takes the radio without the 250 ms cooldown,
+reported as `repeat_preempted` rather than a transmitter fault.
+
+`rf_targets_command` still waits up to 8 s, so multi-target batches must use
+`rf_room_command`. HA v0.5.0 rejects protocol 4 status: use v0.5.1b1 or later.
+
+Camera trials on 13 October 2026 (downstairs bridge, lounge, repeats on): the
+bridge-paced room missed panel 2 on its first pass five times out of five, with
+both 0.6 s and 2 s gaps; repeats recovered it twice and once did not. Separate
+single-target commands moved panel 2 every time (32 of 32 panels). The cause is
+not established. HA v0.5.1b2 therefore sends room sections separately and uses
+the protocol 4 sequence fields only to confirm commands whose action reply was
+lost; `rf_room_command` remains available but unused. The native API sometimes
+drops action replies while the radio command still runs.
+
+## Selectable transmit power (0.12.2-experimental)
+
+**RF transmit power** (config select, restored across reboots, default Minimum)
+sets RF_SETUP bits 2:0 for every burst, at 1 Mbps. On the fitted SI24R1:
+Minimum = -12 dBm, Raised = -6 dBm, High = -4 dBm before the module's PA/LNA
+(on a genuine nRF24L01+: -18, -18 and -12 dBm). The firmware caps the setting at
+High. The module's amplifier gain and antenna are unmeasured; UK 2.4 GHz
+equipment is limited to 100 mW EIRP, so verify the radiated level (for example
+with the Pluto) before treating High as a permanent setting. `rf_targets_status`
+reports `tx_power_level` (0-2).
+
+On 13 October 2026 all three bridges were updated to 0.12.2 with every target
+and counter preserved, and set to High. After a power cycle that cleared a
+degraded Wi-Fi state on the downstairs bridge, two camera-checked lounge room
+actions at High moved all eight panels. The power cycle and power change happened
+together, so the improvement is not attributed to power alone.
