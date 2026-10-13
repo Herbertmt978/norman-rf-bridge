@@ -43,7 +43,7 @@ int main() {
     }
   }
   check(sequential_total_ticks(100,1)==100, "single target keeps the original 100-tick burst");
-  check(sequential_total_ticks(100,4)*55==23815, "four-section room lasts about 23.8 s");
+  check(sequential_total_ticks(100,4)*55==27940, "four-section room lasts about 27.9 s");
   check(sequential_total_ticks(100,8)<=65535, "largest room fits the 16-bit tick counter");
   std::array<LearnedPanel, 32> panels{};
   std::vector<int32_t> slots, positions;

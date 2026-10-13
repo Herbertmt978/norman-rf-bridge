@@ -44,7 +44,7 @@ void error_log(const char*,const char* format,...) {
 const char *TAG="fixture";
 uint32_t ce_low_us=0;
 struct Pin { void digital_write(bool high) { if(!high) ce_low_us=clock_us; } };
-bool sequential_target(size_t tick,size_t copies,size_t &target) { target=tick/(copies+11); return tick%(copies+11)<copies; }
+bool sequential_target(size_t tick,size_t copies,size_t &target) { target=tick/(copies+36); return tick%(copies+36)<copies; }
 class NormanRfMonitor {
 public:
   enum { kRegisterConfig=0,kRegisterEnableAutoAck=1,kRegisterSetupRetransmit=4,
@@ -52,7 +52,7 @@ public:
          kStatusClearAllInterrupts=112,kCommandNoOperation=255 };
   bool tx_active_=true,probing=false;
   uint32_t tx_started_ms_=1,transmitted_count_=0;
-  uint16_t tx_copies_=100,tx_total_ticks_=211,tx_remaining_=211;
+  uint16_t tx_copies_=100,tx_total_ticks_=236,tx_remaining_=236;
   uint32_t tx_deadline_ms_=14000;
   bool late_visible=false;
   size_t tx_target_count_=2,payload_attempts=0,failures=0,probe_reads=0;
@@ -87,11 +87,11 @@ void failure_case(uint8_t original,uint8_t late,bool reset_registers) {
   if(reset_registers) radio.registers={{0,8},{1,63},{4,3},{5,2},{6,14},{23,17}};
   radio.send_test_copy_();
   need(radio.failures==1 && radio.outcome=="radio_tx_failed", "original failure decision changed");
-  need(radio.payload_attempts==1 && radio.transmitted_count_==0 && radio.tx_remaining_==211,
+  need(radio.payload_attempts==1 && radio.transmitted_count_==0 && radio.tx_remaining_==236,
        "failure retried, counted a success or advanced rounds");
   need(radio.probe_reads==7, "missing or unbounded register snapshot");
   need(events.back()=='C' && events[events.size()-2]=='E', "cleanup preceded snapshot/error log");
-  need(error_line.find("target_ordinal=1 targets=2 rounds_remaining=211")!=std::string::npos,
+  need(error_line.find("target_ordinal=1 targets=2 rounds_remaining=236")!=std::string::npos,
        "failure scope missing");
   if(original==0x0e) need(error_line.find("wait_us=2000")!=std::string::npos, "deadline changed");
   if(late==0x2e) need(error_line.find("first_status=0e later_status=2e")!=std::string::npos,
@@ -107,7 +107,7 @@ void stale_sample_case() {
   radio.send_test_copy_();
   need(radio.failures==0 && radio.probe_reads==0 && error_line.empty(),
        "completion visible on the fresh read was falsely aborted");
-  need(radio.payload_attempts==1 && radio.transmitted_count_==1 && radio.tx_remaining_==210,
+  need(radio.payload_attempts==1 && radio.transmitted_count_==1 && radio.tx_remaining_==235,
        "fresh status read resent a payload or skipped a tick");
 }
 int main() {
@@ -115,13 +115,13 @@ int main() {
   healthy.send_test_copy_();
   need(healthy.failures==0 && healthy.probe_reads==0 && error_line.empty(),
        "healthy path performs diagnostic work");
-  need(healthy.payload_attempts==1 && healthy.transmitted_count_==1 && healthy.tx_remaining_==210,
+  need(healthy.payload_attempts==1 && healthy.transmitted_count_==1 && healthy.tx_remaining_==235,
        "healthy tick must send exactly one copy");
-  reset(); NormanRfMonitor gap; gap.first_status=gap.later_status=0x2e; gap.tx_remaining_=111;  // tick 100
+  reset(); NormanRfMonitor gap; gap.first_status=gap.later_status=0x2e; gap.tx_remaining_=136;  // tick 100
   gap.send_test_copy_();
-  need(gap.payload_attempts==0 && gap.transmitted_count_==0 && gap.tx_remaining_==110 && gap.failures==0,
+  need(gap.payload_attempts==0 && gap.transmitted_count_==0 && gap.tx_remaining_==135 && gap.failures==0,
        "idle gap tick must not transmit or fail");
-  reset(); NormanRfMonitor second; second.first_status=second.later_status=0x2e; second.tx_remaining_=100;  // tick 111
+  reset(); NormanRfMonitor second; second.first_status=second.later_status=0x2e; second.tx_remaining_=100;  // tick 136
   second.tx_payloads_[1][0]=0x77; second.send_test_copy_();
   need(second.payload_attempts==1 && second.transmitted_count_==1, "second target's burst follows the gap");
   failure_case(0x0e,0x0e,false);  // missing completion remains missing

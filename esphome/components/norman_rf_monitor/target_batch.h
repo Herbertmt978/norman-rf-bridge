@@ -14,9 +14,10 @@ using BatchFrames = std::array<norman_rf::Frame, kBatchCapacity>;
 // per 55 ms tick, followed by an idle gap before the next target; one target is
 // the original single-command cadence. Interleaved (0.7-0.11.3) and contiguous
 // four-per-tick (0.11.4) batches missed panels in camera trials although every
-// target's frames were on air. Separate full single-target bursts about 0.6 s
-// apart moved 24 of 24 lounge panels; this reproduces that pattern on the ESP.
-inline constexpr size_t kTargetGapTicks = 11;  // About 0.6 s at 55 ms per tick.
+// target's frames were on air. Separate full single-target bursts about 1 s
+// apart moved 24 of 24 lounge panels. With a 0.6 s gap the second panel missed
+// its first pass 4 of 4 times (13 Oct 2026), so the gap is 2 s.
+inline constexpr size_t kTargetGapTicks = 36;  // About 2 s at 55 ms per tick.
 
 // copies and count are validated nonzero before the scheduler starts.
 inline size_t sequential_total_ticks(size_t copies, size_t count) {

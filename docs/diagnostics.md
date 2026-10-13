@@ -193,8 +193,8 @@ probe harness and the pinned ESPHome 2026.4.1 build passed.
 ## Bridge-paced rooms (0.12.0-experimental, protocol 4)
 
 Multi-target commands now send each target's complete burst (100 copies at 55 ms)
-in turn, with an 11-tick (about 0.6 s) idle gap between targets. A four-section
-room takes about 23.8 s. The transmit guard scales with the schedule; single
+in turn, with a 36-tick (about 2 s) idle gap between targets. A four-section
+room takes about 27.9 s. The transmit guard scales with the schedule; single
 commands keep the original 6.5 s guard. `rf_targets_status` adds
 `sequential_rooms`, `command_active` (original burst only), `command_sequence`,
 `completed_sequence` and `command_result`. The new `rf_room_command` action
@@ -205,7 +205,14 @@ Automatic repeats of a room re-run the whole sequence within the existing
 direct command stops the repeat and takes the radio without the 250 ms cooldown,
 reported as `repeat_preempted` rather than a transmitter fault.
 
-`rf_targets_command` still waits up to 8 s, so HA v0.5.0 and earlier must not send
-multi-target batches to this firmware; v0.5.0 sends sections individually, and
-v0.5.1b1 or later uses `rf_room_command`. HA v0.5.0 rejects protocol 4 status:
-update the integration before or with this firmware.
+`rf_targets_command` still waits up to 8 s, so multi-target batches must use
+`rf_room_command`. HA v0.5.0 rejects protocol 4 status: use v0.5.1b1 or later.
+
+Camera trials on 13 October 2026 (downstairs bridge, lounge, repeats on): the
+bridge-paced room missed panel 2 on its first pass five times out of five, with
+both 0.6 s and 2 s gaps; repeats recovered it twice and once did not. Separate
+single-target commands moved panel 2 every time (32 of 32 panels). The cause is
+not established. HA v0.5.1b2 therefore sends room sections separately and uses
+the protocol 4 sequence fields only to confirm commands whose action reply was
+lost; `rf_room_command` remains available but unused. The native API sometimes
+drops action replies while the radio command still runs.

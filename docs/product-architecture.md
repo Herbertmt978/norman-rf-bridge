@@ -30,8 +30,10 @@ RF, then sends each of up to8 targets' full100-copy burst in turn with a
 0.6s gap (0.12.0). Interleaved (0.7-0.11.3) and contiguous four-per-tick (0.11.4)
 batches missed panels in camera trials; separate full bursts did far better.
 Protocol4 adds `rf_room_command`, which replies on acceptance with a sequence
-and expected duration; HA polls `rf_targets_status` until `completed_sequence`
-matches. A newer direct command preempts a running repeat. An individual command
+and expected duration, plus status sequence fields. Camera trials found the
+bridge-paced room missed a panel that separate commands moved, so HA sends
+sections separately and uses the sequence fields only to confirm a command
+whose reply was lost. A newer direct command preempts a running repeat. An individual command
 uses the batch path with one target. A storage failure consumes any earlier reservations
 without transmission or rewind. Batch failure makes all selected states uncertain.
 This copy count follows the locally successful burst test; the
