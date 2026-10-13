@@ -129,7 +129,7 @@ only rolling fields and the recalculated CRC, not a guessed universal opcode.
 The candidate in `Herbertmt978/Norman-HA-Integration` adds **ESPHome RF bridge
 (experimental)** as a separate setup choice. Adopt ESPHome first, then select
 its commissioned bridge. It creates section and room covers using each target's
-preferred closing direction. A room can contain up to8 interleaved targets.
+preferred closing direction. A room can contain up to8 targets, sent one at a time.
 This needs neither hub credentials
 nor a hub fallback. Existing hub covers remain separate and may show stale
 assumed states after direct RF movement.

@@ -76,3 +76,116 @@ Seven native CTest suites, seven Python tool tests and the pinned ESPHome
 2026.4.1 build passed. No shutters were moved for this diagnostics update and no
 transmitter fault was deliberately induced. These checks do not extend the
 existing RF delivery or whole-house reliability claims.
+
+## Optional Bluetooth scan pause (0.11.2-experimental candidate)
+
+**RF pause Bluetooth scanning** is an opt-in configuration switch, initially off.
+When enabled, all actual RF bursts (direct commands, manual/automatic repeats and
+autonomous relays) request a temporary advertisement scan pause. RF never waits
+for Bluetooth acknowledgement, so there is no added RF holdoff or relay wait. Pausing is best
+effort: a scan already starting is stopped on a later main-loop iteration, and a
+Home Assistant scanner-mode change can briefly restart scanning before it is
+stopped again. This is not exclusive RF time or an established timeout fix.
+
+The BLE stack, Improv and existing active proxy connections stay enabled. Those
+connections can still generate Bluetooth traffic. Advertisements may be missed
+while scanning is paused. Each completed or failed burst releases its own pause;
+scanning can resume between automatic repeats. Switching the option off also
+releases a pause without waiting for RF completion.
+
+The guard only owns scanning it observed running and actually requested to stop.
+After that, it restores this firmware's configured continuous-scanning policy;
+the pinned tracker API cannot reveal an externally changed continuous policy.
+It never enables an externally disabled BLE stack or forces a previously idle
+scan it did not own on. If BLE is disabled externally during an owned pause,
+only the overridden continuous policy is restored, so a future external BLE
+re-enable is not stranded with scanning off. Restoring a stop still in progress requests continuous scanning immediately,
+then lets the native tracker finish its asynchronous transition; underlying BLE
+stack failures are not repaired or hidden by this feature.
+
+**Bluetooth RF scan pause** reports the current guard/scanner state. The native
+`rf_targets_status` response additionally includes the enabled setting, state and
+pause-request count since boot. A `scanning` readback means the tracker reported
+RUNNING, not that a particular Bluetooth device was received. Verify actual BLE
+advertisement/connected-device activity before accepting a hardware trial. OTA
+reboots clear volatile radio faults, so compare equivalent relay policy/settings
+and do not attribute an improvement after a reboot to scan pausing alone.
+
+The pinned ESPHome 2026.4.1 tracker skips idle work until its state version
+changes. A guarded PlatformIO pre-build compatibility script changes only the
+generated build copy of `set_scan_continuous()` to wake that native loop when
+the policy changes. The RF component never calls `start_scan()` directly;
+native connecting/disconnecting/discovered-client guards remain in control.
+The installed ESPHome package is untouched. The hook runs through ordinary
+`esphome compile`; another version or unexpected tracker source fails the build
+rather than applying an unverified patch. Builds without `ble_tracker_id` omit
+the hook and Bluetooth-specific includes.
+
+### Limited hardware trial, 13 October 2026
+
+The local candidate was installed on one bridge with 14 commissioned targets
+preserved. With automatic repeats disabled for the comparison, one four-panel
+Close/Open pair passed with the pause option off. With it on, Close moved all
+four but Open missed one panel despite successful API completion. This sample
+does not establish a delivery benefit or regression. The prior firmware also
+missed a panel in a separate trial; its fault latch and the OTA reboot confound
+comparison between firmware versions.
+
+During a subsequent deliberate Open restoration with normal automatic repeats
+enabled, the guard paused for the original burst and both repeats, resumed
+between them, and returned to scanning afterwards. All four panels were open
+after the observation window. Fresh advertisements reached HA. No active GATT
+connection was exercised, so uninterrupted connected-device operation remains
+unqualified on hardware. The option remains experimental, not a demonstrated
+repair for missed movement or intermittent native API status timeouts.
+
+Eight native suites, seven existing Python tool tests, five compatibility-hook
+tests, eight native tracker-loop scenarios and the full pinned firmware build
+passed. Main promotion and wider rollout remain on hold pending RF reliability
+acceptance.
+
+## Transmitter-completion failure probe (0.11.3-experimental candidate)
+
+A `radio_tx_failed` event now emits one bounded ERROR line before cleanup clears
+radio interrupts/FIFO and restores receive mode. It contains the original and
+later STATUS, FIFO_STATUS, CONFIG, EN_AA, SETUP_RETR, RF_CH and RF_SETUP registers,
+completion-wait and probe durations in microseconds, selected-target ordinal,
+selected-target count and remaining rounds. No frames, target identities, names
+or rolling counters are logged. The snapshot is a short sequence of reads,
+not an atomic capture.
+
+Original STATUS bit `0x20` is TX_DS (local packet transmission completed) and
+`0x10` is MAX_RT. With automatic acknowledgement/retransmission configured off,
+MAX_RT is unexpected and deserves comparison with EN_AA/SETUP_RETR. If TX_DS is
+absent in the original STATUS but present in the later read, completion arrived
+(or became visible) after the bounded poll ended. That distinguishes a late
+local completion from a STATUS that remains without TX_DS; it does not establish
+why the earlier poll missed it. CONFIG, RF_CH and RF_SETUP help identify an
+unexpected mode/channel/setup or apparent radio reset. All-zero/all-one reads
+may also indicate SPI or power trouble and are not conclusive by themselves.
+
+The original two-millisecond completion poll, RF power, packet cadence, counters
+and failure handling remain unchanged. The probe adds read/log work only after
+the failure has already been decided. Even if later STATUS shows TX_DS, the
+original failure is retained: no retry, false success or movement acknowledgement
+is introduced. This is diagnostic instrumentation, not a reliability fix; the
+separately reproduced receive-FIFO channel-attribution defect is not changed.
+
+## Contiguous batches and stale-status read (0.11.4-experimental candidate)
+
+A multi-target batch now gives each target one contiguous block of rounds instead
+of interleaving every target in each 55 ms round. Total rounds, copies per round
+and airtime are unchanged; uneven splits differ by one round. Single-target
+commands and relays behave as before. Separately, when the two-millisecond
+completion poll ends without TX_DS or MAX_RT, the sender reads STATUS once more
+before declaring `radio_tx_failed`. That removes a reproduced stale-sample false
+abort without resending a payload; MAX_RT and missing completion still fail.
+
+Installed on the downstairs bridge on 13 October 2026 with all 14 target records
+and counters unchanged. With automatic repeats and downstairs relay off, the
+four-panel lounge room batch still missed one panel on Close and one on Open.
+Contiguous blocks are therefore not a delivery fix. The same panels sent as four
+separate single-target commands moved 24 of 24 times over three close/open pairs.
+The Norman HA integration now sends room sections one at a time; multi-target
+batches remain available to other callers. Eight native suites, the completion
+probe harness and the pinned ESPHome 2026.4.1 build passed.

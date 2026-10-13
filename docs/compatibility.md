@@ -94,7 +94,7 @@ For **direct HA control**, learn each motorised section and assign each room to
 one direct-command bridge. HA sends Open/Close to that bridge, which creates
 the next valid learned command. It can replace the hub's role in those HA
 actions without needing the hub reachable over RF. The current whole-room
-control is an interleaved batch of individual section commands, not a generated
+control sends individual section commands one after another, not a generated
 native room packet.
 
 Use other bridges to repeat those frames, not to independently generate commands

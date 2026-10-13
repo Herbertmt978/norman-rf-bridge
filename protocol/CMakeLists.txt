@@ -69,3 +69,8 @@ target_include_directories(norman_rf_relay_endpoint_tests PRIVATE
   tests/fakes ../esphome/components/norman_rf_monitor)
 target_link_libraries(norman_rf_relay_endpoint_tests PRIVATE norman_rf_protocol)
 add_test(NAME norman_rf_relay_endpoint_tests COMMAND norman_rf_relay_endpoint_tests)
+
+add_executable(norman_rf_ble_scan_pause_tests tests/ble_scan_pause_tests.cpp)
+target_include_directories(norman_rf_ble_scan_pause_tests PRIVATE ../esphome/components/norman_rf_monitor)
+target_compile_features(norman_rf_ble_scan_pause_tests PRIVATE cxx_std_17)
+add_test(NAME norman_rf_ble_scan_pause_tests COMMAND norman_rf_ble_scan_pause_tests)

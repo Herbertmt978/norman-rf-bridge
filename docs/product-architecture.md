@@ -25,9 +25,12 @@ physical whole-house acceptance remains distinct from a successful RF burst.
 Direct commands select an explicitly learned open, close-down or optional
 close-up template. The ESP reserves the next counter in nonvolatile storage,
 updates the two rolling bytes and CRC, then sends 100 copies on channel15 at
-55ms spacing. A room batch reserves all selected counters before any RF, then
-interleaves up to8 targets in each55ms round. An individual command uses that
-same path with one target. A storage failure consumes any earlier reservations
+55ms spacing. A multi-target batch reserves all selected counters before any
+RF, then gives each of up to8 targets one contiguous block of55ms rounds
+(0.11.4; earlier versions interleaved them). The HA room covers no longer use
+multi-target batches: they send each section as its own command, because
+interleaved and contiguous batches both missed panels in camera trials while
+sequential commands did not. An individual command uses the batch path with one target. A storage failure consumes any earlier reservations
 without transmission or rewind. Batch failure makes all selected states uncertain.
 This copy count follows the locally successful burst test; the
 earlier proposed 1–3-copy limit was not established by measurement.

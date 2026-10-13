@@ -41,6 +41,59 @@ void NormanRfMonitor::setup() {
   ESP_LOGI(TAG, "Radio verified; learned panel=%s; autonomous relay=%s", YESNO(panels_[0].ready()), YESNO(relay_enabled()));
 }
 
+void NormanRfMonitor::update_ble_scan_pause_() {
+#ifdef USE_NORMAN_RF_BLE_SCAN_PAUSE
+  if (ble_tracker_ == nullptr) return;
+  using esp32_ble_tracker::ScannerState;
+  const auto current = ble_tracker_->get_scanner_state();
+  ScanState state = ScanState::FAILED;
+  switch (current) {
+    case ScannerState::IDLE: state = ScanState::IDLE; break;
+    case ScannerState::STARTING: state = ScanState::STARTING; break;
+    case ScannerState::RUNNING: state = ScanState::RUNNING; break;
+    case ScannerState::STOPPING: state = ScanState::STOPPING; break;
+    case ScannerState::FAILED: break;
+  }
+  const bool ble_active = ble_tracker_->get_parent()->is_active();
+  const auto action = ble_scan_pause_.update(ble_scan_pause_enabled_, tx_active_, ble_active, state);
+  if (action == ScanAction::STOP) {
+    ++ble_scan_pause_count_;
+    ble_tracker_->stop_scan();
+    ESP_LOGD(TAG, "RF requested Bluetooth advertisement scan pause");
+  } else if (action == ScanAction::KEEP_PAUSED) {
+    // HA scanner-mode changes may restore continuous scanning. Reassert our
+    // best-effort pause on subsequent loops, without disconnecting BLE clients.
+    ble_tracker_->set_scan_continuous(false);
+  } else if (action == ScanAction::RESUME_CONTINUOUS) {
+    ble_tracker_->set_scan_continuous(true);
+    // The build-copy setter wakes the native tracker loop, which owns all
+    // connecting/disconnecting/discovered-client guards. Never bypass them.
+    ESP_LOGD(TAG, "RF released Bluetooth scan pause; continuous scanning requested");
+  }
+#endif
+}
+
+std::string NormanRfMonitor::ble_scan_pause_status() const {
+#ifdef USE_NORMAN_RF_BLE_SCAN_PAUSE
+  if (ble_tracker_ == nullptr) return "unconfigured";
+  if (!ble_tracker_->get_parent()->is_active()) return "ble_disabled";
+  if (!ble_scan_pause_enabled_) return "disabled";
+  using esp32_ble_tracker::ScannerState;
+  const auto state = ble_tracker_->get_scanner_state();
+  if (tx_active_ && ble_scan_pause_.owned())
+    return state == ScannerState::IDLE ? "paused" : "pause_requested";
+  if (tx_active_) return "waiting_for_active_scan";
+  return state == ScannerState::RUNNING ? "scanning" : "scanner_transition_or_idle";
+#else
+  return "unconfigured";
+#endif
+}
+
+void NormanRfMonitor::on_shutdown() {
+  ble_scan_pause_enabled_ = false;
+  update_ble_scan_pause_();
+}
+
 void NormanRfMonitor::dump_config() {
   ESP_LOGCONFIG(TAG, "Norman RF Monitor:");
   LOG_PIN("  CE Pin: ", this->ce_pin_);
@@ -480,8 +533,10 @@ bool NormanRfMonitor::start_bursts_(const BatchFrames &frames, size_t count, int
     std::copy(frames[i].begin(), frames[i].end(), tx_payloads_[i].begin());
   }
   tx_target_count_ = count;
+  this->tx_rounds_ = static_cast<uint16_t>(copies);
   this->tx_remaining_ = static_cast<uint16_t>(copies);
   this->tx_active_ = true;
+  this->update_ble_scan_pause_();
   this->tx_is_relay_ = relay;
   if (!relay) this->command_success_ = false;
   this->tx_started_ms_ = now;
@@ -533,7 +588,7 @@ void NormanRfMonitor::send_test_copy_() {
   }
   const uint32_t round_started = micros();
   for (size_t offset = 0; offset < tx_target_count_; ++offset) {
-  const size_t target = batch_target_index(100 - tx_remaining_, offset, tx_target_count_);
+  const size_t target = batch_block_target(tx_rounds_ - tx_remaining_, tx_rounds_, tx_target_count_);
   this->write_register_(kRegisterStatus, kStatusClearAllInterrupts);
   this->enable();
   this->transfer_byte(0xa0);  // W_TX_PAYLOAD, 30-byte frame plus two zero bytes.
@@ -549,7 +604,27 @@ void NormanRfMonitor::send_test_copy_() {
     if (status & 0x30) break;  // TX_DS or MAX_RT.
     delay_microseconds_safe(25);
   } while (static_cast<uint32_t>(micros() - started) < 2000);
+  // A pre-empted loop can pass its deadline holding a stale pre-completion
+  // sample. Read once more before deciding failure; never resend the payload.
+  if (!(status & 0x30)) status = this->issue_command_(kCommandNoOperation);
   if (!(status & 0x20) || (status & 0x10)) {
+    // Capture before finish_test_ clears interrupts/FIFO and restores RX. Reads
+    // only: do not extend the completion deadline, retransmit or alter power.
+    const uint32_t waited_us = micros() - started;
+    const uint32_t probe_started = micros();
+    uint8_t fifo = 0, config = 0, en_aa = 0, retr = 0, channel = 0, setup = 0, later_status = 0;
+    this->read_register_(kRegisterFifoStatus, &fifo);
+    this->read_register_(kRegisterConfig, &config);
+    this->read_register_(kRegisterEnableAutoAck, &en_aa);
+    this->read_register_(kRegisterSetupRetransmit, &retr);
+    this->read_register_(kRegisterRfChannel, &channel);
+    this->read_register_(kRegisterRfSetup, &setup);
+    this->read_register_(kRegisterStatus, &later_status);
+    ESP_LOGE(TAG, "RF completion failure: first_status=%02x later_status=%02x fifo=%02x config=%02x en_aa=%02x retr=%02x channel=%u setup=%02x wait_us=%lu probe_us=%lu target_ordinal=%u targets=%u rounds_remaining=%u",
+             status, later_status, fifo, config, en_aa, retr, channel, setup,
+             static_cast<unsigned long>(waited_us), static_cast<unsigned long>(micros() - probe_started),
+             static_cast<unsigned>(target + 1), static_cast<unsigned>(tx_target_count_),
+             static_cast<unsigned>(tx_remaining_));
     this->finish_test_("radio_tx_failed");
     return;
   }
@@ -573,6 +648,7 @@ void NormanRfMonitor::finish_test_(const char *status) {
   this->write_register_(kRegisterConfig, kConfigPowerUp | kConfigPrimaryRx);
   this->ce_pin_->digital_write(true);
   this->tx_active_ = false;
+  this->update_ble_scan_pause_();
   if (!tx_is_relay_) {
     command_success_ = std::string(status) == "complete_not_acknowledged";
     command_repeat_.completed(millis(), command_success_);
