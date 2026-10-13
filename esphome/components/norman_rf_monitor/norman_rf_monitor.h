@@ -13,6 +13,13 @@
 #include "command_repeat.h"
 #include "learning_session.h"
 #include "diagnostics.h"
+#include "ble_scan_pause.h"
+#ifdef USE_NORMAN_RF_BLE_SCAN_PAUSE
+#include "esphome/components/esp32_ble_tracker/esp32_ble_tracker.h"
+#ifndef NORMAN_RF_TRACKER_POLICY_WAKEUP
+#error "Norman BLE pause requires the pinned generated-build compatibility patch"
+#endif
+#endif
 #include "esphome/components/json/json_util.h"
 
 namespace esphome::norman_rf_monitor {
@@ -24,10 +31,19 @@ class NormanRfMonitor : public Component,
                                               spi::DATA_RATE_4MHZ> {
  public:
   void setup() override;
+  void loop() override { update_ble_scan_pause_(); }
+  void on_shutdown() override;
   void dump_config() override;
   float get_setup_priority() const override { return setup_priority::HARDWARE; }
 
   void set_ce_pin(GPIOPin *ce_pin) { ce_pin_ = ce_pin; }
+#ifdef USE_NORMAN_RF_BLE_SCAN_PAUSE
+  void set_ble_tracker(esp32_ble_tracker::ESP32BLETracker *tracker) { ble_tracker_ = tracker; }
+#endif
+  void set_ble_scan_pause_enabled(bool enabled) { ble_scan_pause_enabled_ = enabled; update_ble_scan_pause_(); }
+  bool ble_scan_pause_enabled() const { return ble_scan_pause_enabled_; }
+  uint32_t ble_scan_pause_count() const { return ble_scan_pause_count_; }
+  std::string ble_scan_pause_status() const;
 
   bool radio_ready() const { return radio_ready_; }
   std::string hardware_status() const { return hardware_status_; }
@@ -98,6 +114,13 @@ class NormanRfMonitor : public Component,
   }
 
  protected:
+  void update_ble_scan_pause_();
+#ifdef USE_NORMAN_RF_BLE_SCAN_PAUSE
+  esp32_ble_tracker::ESP32BLETracker *ble_tracker_{nullptr};
+#endif
+  BleScanPause ble_scan_pause_;
+  bool ble_scan_pause_enabled_{false};
+  uint32_t ble_scan_pause_count_{0};
   static constexpr uint8_t kRegisterConfig = 0x00;
   static constexpr uint8_t kRegisterEnableAutoAck = 0x01;
   static constexpr uint8_t kRegisterEnableRxAddress = 0x02;
@@ -174,6 +197,7 @@ class NormanRfMonitor : public Component,
   std::array<std::array<uint8_t, kPayloadWidth>, kBatchCapacity> tx_payloads_{};
   size_t tx_target_count_{0};
   bool tx_active_{false};
+  uint16_t tx_rounds_{0};
   uint16_t tx_remaining_{0};
   uint32_t tx_started_ms_{0};
   uint32_t tx_last_finished_ms_{0};

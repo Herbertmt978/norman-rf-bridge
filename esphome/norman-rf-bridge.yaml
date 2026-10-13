@@ -1,7 +1,7 @@
 substitutions:
   device_name: norman-rf-bridge
   friendly_name: Norman RF Bridge
-  project_version: 0.11.1-experimental
+  project_version: 0.11.4-experimental
 
 esphome:
   name: ${device_name}
@@ -127,6 +127,9 @@ api:
       then:
         - api.respond:
             data: !lambda |-
+              root["ble_scan_pause_enabled"] = id(rf_monitor).ble_scan_pause_enabled();
+              root["ble_scan_pause_state"] = id(rf_monitor).ble_scan_pause_status();
+              root["ble_scan_pause_count"] = id(rf_monitor).ble_scan_pause_count();
               root["protocol_version"] = 3;
               root["batch_capacity"] = 8;
               root["automatic_repeats"] = id(rf_monitor).automatic_repeats();
@@ -350,6 +353,7 @@ norman_rf_monitor:
   spi_id: norman_radio_spi
   cs_pin: GPIO5
   ce_pin: GPIO4
+  ble_tracker_id: ble_tracker
 
 debug:
   update_interval: 60s
@@ -384,6 +388,11 @@ binary_sensor:
     lambda: return id(rf_monitor).radio_ready();
 
 text_sensor:
+  - platform: template
+    name: Bluetooth RF scan pause
+    entity_category: diagnostic
+    update_interval: 1s
+    lambda: return id(rf_monitor).ble_scan_pause_status();
   - platform: template
     name: RF last direct command
     entity_category: diagnostic
@@ -610,6 +619,16 @@ button:
     entity_category: diagnostic
 
 switch:
+  - platform: template
+    name: RF pause Bluetooth scanning
+    entity_category: config
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - lambda: id(rf_monitor).set_ble_scan_pause_enabled(true);
+    turn_off_action:
+      - lambda: id(rf_monitor).set_ble_scan_pause_enabled(false);
+
   - platform: template
     name: RF automatic command repeats
     entity_category: config

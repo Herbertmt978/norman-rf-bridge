@@ -11,22 +11,32 @@ void crc(norman_rf::Frame &f) {
   f[28] = static_cast<uint8_t>(c >> 8); f[29] = static_cast<uint8_t>(c);
 }
 int main() {
-  for (size_t count=1;count<=8;++count) {
-    std::array<int,8> first{}, copies{};
-    for (size_t round=0;round<100;++round) {
-      std::array<bool,8> seen{};
-      ++first[batch_target_index(round,0,count)];
-      for (size_t offset=0;offset<count;++offset) {
-        const auto index=batch_target_index(round,offset,count);
-        check(index<count && !seen[index], "each target appears exactly once per round");
-        seen[index]=true; ++copies[index];
+  for (size_t rounds : {size_t{100}, size_t{20}}) {
+    for (size_t count=1;count<=8;++count) {
+      std::array<int,8> copies{}, transitions{};
+      size_t previous=0;
+      for (size_t round=0;round<rounds;++round) {
+        // send_test_copy_ sends count copies per round, all of the round's target.
+        const auto index=batch_block_target(round,rounds,count);
+        check(index<count, "block target within batch");
+        check(index>=previous, "targets never interleave or return");
+        if (round>0 && index!=previous) ++transitions[index];
+        previous=index;
+        copies[index]+=static_cast<int>(count);
+      }
+      check(batch_block_target(0,rounds,count)==0, "first block is first selected target");
+      int total=0; for (size_t i=0;i<count;++i) total+=copies[i];
+      check(total==static_cast<int>(rounds*count), "total airtime unchanged");
+      if (rounds==100 && 100%count==0)
+        for (size_t i=0;i<count;++i) check(copies[i]==100, "even blocks keep100copies per target");
+      for (size_t i=0;i<count;++i) {
+        check(copies[i]>=static_cast<int>((rounds/count)*count) &&
+              copies[i]<=static_cast<int>((rounds/count+1)*count), "blocks balanced to one round");
+        check(i==0 || transitions[i]==1, "each later target starts exactly once");
       }
     }
-    for (size_t i=0;i<count;++i) {
-      check(copies[i]==100, "rotating order preserves100copies per target");
-      check(first[i]>=100/count && first[i]<=100/count+1, "first positions balanced");
-    }
   }
+  check(batch_block_target(99,100,1)==0, "single target keeps original one-copy cadence");
   std::array<LearnedPanel, 32> panels{};
   std::vector<int32_t> slots, positions;
   std::vector<std::string> ids;

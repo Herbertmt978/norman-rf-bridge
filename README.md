@@ -30,8 +30,8 @@ independent project, not an official Norman product.
 [Norman integration](https://github.com/Herbertmt978/Norman-HA-Integration)
 adds individual section and whole-room Open/Close controls. HA sends a Wi-Fi
 command to the local ESP; the nRF24-compatible module sends the shutter command.
-That path doesn't call the Norman hub or need its password. The integration's
-RF transport is currently a pre-release feature; follow its
+That path doesn't call the Norman hub or need its password. The RF transport
+is an experimental part of Norman integration v0.5.0 and later; follow its
 [RF setup guide](https://github.com/Herbertmt978/Norman-HA-Integration/blob/main/docs/esphome-rf.md).
 
 **Work as a USB-powered repeater.** After learning the installation's commands
@@ -64,7 +64,10 @@ It starts enabled and remembers your choice. Reboots don't replay old commands.
 proxy, Wi-Fi signal and uptime diagnostics, radio counters, and OTA updates.
 Version **0.11.1-experimental** adds last-command and RF-activity ages, transmitter
 faults, learning/profile counts, memory and loop timing, plus a three-second
-onboard LED Identify button. See [the diagnostic entity guide](docs/diagnostics.md).
+onboard LED Identify button. Version **0.11.4-experimental** adds an optional
+Bluetooth scan pause during RF, a fault-time radio register snapshot and a
+fresh status read that prevents a false transmitter abort. See [the diagnostic
+entity guide](docs/diagnostics.md).
 You can add supported sensors on spare pins once power and pin conflicts are
 checked. The external radio is for Norman RF; it isn't a Wi-Fi adapter or a
 general-purpose packet sniffer.
@@ -188,9 +191,11 @@ recover some misses; they cannot guarantee reception or fix every fault.
 
 HA shows the requested state after the first successful burst. There is no
 motor acknowledgement or measured position, so a green HA action is not proof
-that a panel moved. Room controls use interleaved individual commands, not a
-native whole-room broadcast, and the motors may start at different times.
-There are 32 profile slots per bridge and up to eight sections in one room batch.
+that a panel moved. Room controls send each section as its own command, one
+after another (about 6 s each), not a native whole-room broadcast. Sections
+addressed together in one burst intermittently failed to move; sequential
+commands moved every lounge panel in camera-checked trials.
+There are 32 profile slots per bridge and up to eight sections in one room.
 Stop, arbitrary percentage positioning and battery feedback aren't implemented.
 
 The current bench image has **no API encryption or OTA authentication** and an
