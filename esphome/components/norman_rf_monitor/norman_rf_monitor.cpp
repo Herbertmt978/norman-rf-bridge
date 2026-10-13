@@ -431,6 +431,7 @@ void NormanRfMonitor::repeat_if_due_() {
     command_repeat_.clear();
     return;
   }
+  tx_is_repeat_ = true;
   ++automatic_repeat_count_;
   ESP_LOGI(TAG, "Automatic repeat: unchanged command bytes and rolling indices; targets=%u remaining=%u",
            static_cast<unsigned>(count), static_cast<unsigned>(repeats_remaining()));
@@ -491,11 +492,14 @@ bool NormanRfMonitor::start_burst_(const norman_rf::Frame &frame, int channel, i
 bool NormanRfMonitor::transmit_targets(const std::vector<int32_t> &slots,
                                      const std::vector<int32_t> &positions,
                                      const std::vector<std::string> &identities) {
+  preempt_repeat_();
   command_repeat_.clear();
   if (!can_transmit_()) return false;
   BatchFrames frames{};
   if (!prepare_target_batch(panels_, slots, positions, identities, frames)) return false;
   if (!start_bursts_(frames, slots.size(), 15, 100, false)) return false;
+  ++command_sequence_;
+  command_result_ = "command_active";
   command_repeat_.remember(slots, positions, identities, frames, panels_, millis());
   last_command_.mark(millis_64());
   const auto &first = panels_[slots[0]];
@@ -514,6 +518,7 @@ bool NormanRfMonitor::repeat_targets(const std::vector<int32_t> &slots,
   BatchFrames frames{};
   if (!command_repeat_.take(slots, positions, identities, panels_, millis(), frames)) return false;
   if (!start_bursts_(frames, slots.size(), 15, 100, false)) return false;
+  tx_is_repeat_ = true;
   ESP_LOGI(TAG, "Explicit repeat: unchanged command bytes and rolling indices; targets=%u",
            static_cast<unsigned>(slots.size()));
   return true;
@@ -533,8 +538,12 @@ bool NormanRfMonitor::start_bursts_(const BatchFrames &frames, size_t count, int
     std::copy(frames[i].begin(), frames[i].end(), tx_payloads_[i].begin());
   }
   tx_target_count_ = count;
-  this->tx_rounds_ = static_cast<uint16_t>(copies);
-  this->tx_remaining_ = static_cast<uint16_t>(copies);
+  tx_copies_ = static_cast<uint16_t>(copies);
+  tx_total_ticks_ = static_cast<uint16_t>(sequential_total_ticks(copies, count));
+  this->tx_remaining_ = tx_total_ticks_;
+  // Single bursts keep the original 6.5 s guard; rooms scale with their schedule.
+  tx_deadline_ms_ = std::max<uint32_t>(6500, tx_total_ticks_ * 55U + 2000U);
+  tx_is_repeat_ = false;
   this->tx_active_ = true;
   this->update_ble_scan_pause_();
   this->tx_is_relay_ = relay;
@@ -552,14 +561,18 @@ bool NormanRfMonitor::start_bursts_(const BatchFrames &frames, size_t count, int
   this->disable();
   this->write_register_(kRegisterConfig, kConfigPowerUp);  // PTX, no radio CRC/ACK.
   this->set_interval("bounded_tx", 55, [this]() { this->send_test_copy_(); });
-  ESP_LOGI(TAG, "TX armed ms=%lu channel=%d targets=%u copies_each=%d round=55ms width=32 min_power",
-           static_cast<unsigned long>(now), channel, static_cast<unsigned>(count), copies);
+  ESP_LOGI(TAG, "TX armed ms=%lu channel=%d targets=%u copies_each=%d sequential ticks=%u tick=55ms width=32 min_power",
+           static_cast<unsigned long>(now), channel, static_cast<unsigned>(count), copies,
+           static_cast<unsigned>(tx_total_ticks_));
   return true;
 }
 
 bool NormanRfMonitor::transmit_targets_json(const std::string &request, bool repeat) {
   // Even a rejected newer command must not leave old background work pending.
-  if (!repeat) command_repeat_.clear();
+  if (!repeat) {
+    preempt_repeat_();
+    command_repeat_.clear();
+  }
   if (request.size() > 2048 || !can_transmit_()) return false;
   return json::parse_json(request, [this, repeat](JsonObject root) -> bool {
     if (root.size() != 3 || !root["slots"].is<JsonArray>() || !root["positions"].is<JsonArray>() ||
@@ -582,13 +595,12 @@ bool NormanRfMonitor::transmit_targets_json(const std::string &request, bool rep
 
 void NormanRfMonitor::send_test_copy_() {
   if (!this->tx_active_) return;
-  if (static_cast<uint32_t>(millis() - this->tx_started_ms_) > 6500) {
+  if (static_cast<uint32_t>(millis() - this->tx_started_ms_) > tx_deadline_ms_) {
     this->finish_test_("test_timeout");
     return;
   }
-  const uint32_t round_started = micros();
-  for (size_t offset = 0; offset < tx_target_count_; ++offset) {
-  const size_t target = batch_block_target(tx_rounds_ - tx_remaining_, tx_rounds_, tx_target_count_);
+  size_t target = 0;
+  if (sequential_target(tx_total_ticks_ - tx_remaining_, tx_copies_, target)) {
   this->write_register_(kRegisterStatus, kStatusClearAllInterrupts);
   this->enable();
   this->transfer_byte(0xa0);  // W_TX_PAYLOAD, 30-byte frame plus two zero bytes.
@@ -630,9 +642,6 @@ void NormanRfMonitor::send_test_copy_() {
   }
   ++this->transmitted_count_;
   }
-  if (tx_remaining_ == 100 && tx_target_count_ > 1)
-    ESP_LOGI(TAG, "First round: %u targets completed in %lu us",
-             static_cast<unsigned>(tx_target_count_), static_cast<unsigned long>(micros() - round_started));
   if (--this->tx_remaining_ == 0) this->finish_test_("complete_not_acknowledged");
 }
 
@@ -652,6 +661,10 @@ void NormanRfMonitor::finish_test_(const char *status) {
   if (!tx_is_relay_) {
     command_success_ = std::string(status) == "complete_not_acknowledged";
     command_repeat_.completed(millis(), command_success_);
+    if (!tx_is_repeat_) {
+      completed_sequence_ = command_sequence_;
+      command_result_ = status;
+    }
   }
   if (std::string(status) != "complete_not_acknowledged") {
     relay_fault_ = true;
@@ -663,6 +676,28 @@ void NormanRfMonitor::finish_test_(const char *status) {
   this->select_receive_channel_();
   ESP_LOGI(TAG, "TX finished: %s; total=%lu; monitor resumed", status,
            static_cast<unsigned long>(this->transmitted_count_));
+}
+
+void NormanRfMonitor::preempt_repeat_() {
+  // Automatic and manual repeats are optional extra bursts of an already
+  // completed command. A newer direct command takes the radio immediately
+  // instead of being rejected as busy; the repeat is not a transmitter fault.
+  if (!tx_active_ || tx_is_relay_ || !tx_is_repeat_) return;
+  this->cancel_interval("bounded_tx");
+  this->ce_pin_->digital_write(false);
+  this->issue_command_(0xe1);
+  this->write_register_(kRegisterStatus, kStatusClearAllInterrupts);
+  this->write_register_(kRegisterRfChannel, kCandidateChannels[this->channel_index_]);
+  this->write_register_(kRegisterConfig, kConfigPowerUp | kConfigPrimaryRx);
+  this->ce_pin_->digital_write(true);
+  this->tx_active_ = false;
+  this->tx_is_repeat_ = false;
+  this->update_ble_scan_pause_();
+  command_repeat_.clear();
+  this->tx_has_finished_ = false;  // The new command reconfigures the radio; no cooldown.
+  this->tx_status_ = "repeat_preempted";
+  this->select_receive_channel_();
+  ESP_LOGI(TAG, "Repeat preempted by a newer direct command");
 }
 
 }  // namespace esphome::norman_rf_monitor

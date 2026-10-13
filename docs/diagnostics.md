@@ -189,3 +189,23 @@ separate single-target commands moved 24 of 24 times over three close/open pairs
 The Norman HA integration now sends room sections one at a time; multi-target
 batches remain available to other callers. Eight native suites, the completion
 probe harness and the pinned ESPHome 2026.4.1 build passed.
+
+## Bridge-paced rooms (0.12.0-experimental, protocol 4)
+
+Multi-target commands now send each target's complete burst (100 copies at 55 ms)
+in turn, with an 11-tick (about 0.6 s) idle gap between targets. A four-section
+room takes about 23.8 s. The transmit guard scales with the schedule; single
+commands keep the original 6.5 s guard. `rf_targets_status` adds
+`sequential_rooms`, `command_active` (original burst only), `command_sequence`,
+`completed_sequence` and `command_result`. The new `rf_room_command` action
+replies on acceptance with `sequence` and `expected_ms`.
+
+Automatic repeats of a room re-run the whole sequence within the existing
+60-second budget. Automatic and manual repeats are now preemptible: a newer
+direct command stops the repeat and takes the radio without the 250 ms cooldown,
+reported as `repeat_preempted` rather than a transmitter fault.
+
+`rf_targets_command` still waits up to 8 s, so HA v0.5.0 and earlier must not send
+multi-target batches to this firmware; v0.5.0 sends sections individually, and
+v0.5.1b1 or later uses `rf_room_command`. HA v0.5.0 rejects protocol 4 status:
+update the integration before or with this firmware.

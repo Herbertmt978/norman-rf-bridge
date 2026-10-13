@@ -191,10 +191,12 @@ recover some misses; they cannot guarantee reception or fix every fault.
 
 HA shows the requested state after the first successful burst. There is no
 motor acknowledgement or measured position, so a green HA action is not proof
-that a panel moved. Room controls send each section as its own command, one
-after another (about 6 s each), not a native whole-room broadcast. Sections
-addressed together in one burst intermittently failed to move; sequential
-commands moved every lounge panel in camera-checked trials.
+that a panel moved. Room controls send each section's full burst one after
+another (about 6 s each), not a native whole-room broadcast. From firmware
+**0.12.0-experimental** the bridge paces the whole room from one HA command, so
+a Wi-Fi stall can't cut a room short and automatic repeats cover every section.
+Sections addressed together in one interleaved burst intermittently failed to
+move.
 There are 32 profile slots per bridge and up to eight sections in one room.
 Stop, arbitrary percentage positioning and battery feedback aren't implemented.
 

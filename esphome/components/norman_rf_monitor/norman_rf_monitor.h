@@ -80,6 +80,13 @@ class NormanRfMonitor : public Component,
   int open_position() const { return panels_[0].open_position(); }
   bool close_up_ready() const { return panels_[0].supports(100); }
   bool command_active() const { return tx_active_ && !tx_is_relay_; }
+  // Protocol 4 room completion: HA matches its accepted sequence to the result
+  // of the original burst. Repeats never change the recorded outcome.
+  bool original_command_active() const { return command_active() && !tx_is_repeat_; }
+  uint32_t command_sequence() const { return command_sequence_; }
+  uint32_t completed_sequence() const { return completed_sequence_; }
+  std::string command_result() const { return command_result_; }
+  uint32_t command_expected_ms() const { return tx_total_ticks_ * 55U; }
   bool command_success() const { return command_success_; }
   uint32_t relayed_count() const { return relayed_count_; }
   std::string panel_status() const;
@@ -177,6 +184,7 @@ class NormanRfMonitor : public Component,
   void select_receive_channel_();
   void handle_valid_frame_(const std::array<uint8_t, kPayloadWidth> &payload, uint32_t now);
   void repeat_if_due_();
+  void preempt_repeat_();
 
   GPIOPin *ce_pin_{nullptr};
   bool radio_ready_{false};
@@ -197,8 +205,14 @@ class NormanRfMonitor : public Component,
   std::array<std::array<uint8_t, kPayloadWidth>, kBatchCapacity> tx_payloads_{};
   size_t tx_target_count_{0};
   bool tx_active_{false};
-  uint16_t tx_rounds_{0};
+  uint16_t tx_copies_{0};
+  uint16_t tx_total_ticks_{0};
   uint16_t tx_remaining_{0};
+  uint32_t tx_deadline_ms_{6500};
+  bool tx_is_repeat_{false};
+  uint32_t command_sequence_{0};
+  uint32_t completed_sequence_{0};
+  std::string command_result_{"none_since_boot"};
   uint32_t tx_started_ms_{0};
   uint32_t tx_last_finished_ms_{0};
   bool tx_has_finished_{false};
